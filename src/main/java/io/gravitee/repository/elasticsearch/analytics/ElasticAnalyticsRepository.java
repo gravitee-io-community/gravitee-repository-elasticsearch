@@ -21,16 +21,16 @@ import org.elasticsearch.action.search.SearchRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.search.SearchType;
 import org.elasticsearch.client.Client;
-import org.elasticsearch.index.query.*;
-import org.elasticsearch.search.aggregations.Aggregation;
+import org.elasticsearch.index.query.QueryBuilder;
+import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.index.query.RangeFilterBuilder;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import java.time.Instant;
-
-import static org.elasticsearch.index.query.FilterBuilders.*;
+import static org.elasticsearch.index.query.FilterBuilders.rangeFilter;
 import static org.elasticsearch.index.query.QueryBuilders.*;
-import static org.elasticsearch.search.aggregations.AggregationBuilders.*;
+import static org.elasticsearch.search.aggregations.AggregationBuilders.dateHistogram;
+import static org.elasticsearch.search.aggregations.AggregationBuilders.terms;
 
 /**
  * @author David BRASSELY (brasseld at gmail.com)
@@ -96,24 +96,9 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
         // And set aggregation to the request
         requestBuilder.addAggregation(aggregationBuilder);
 
-        System.out.println("-------------");
-        System.out.println(Instant.ofEpochMilli(query.dateRange().start()));
-        System.out.println(Instant.ofEpochMilli(query.dateRange().end()));
-
-        System.out.println("-------------");
-        System.out.println(requestBuilder.toString());
-
         // And get the response from ES
         SearchResponse response = requestBuilder.get();
 
-        System.out.println("-------------");
-        System.out.println("HITS: " + response.getHits().getTotalHits());
-        System.out.println("-------------");
-        System.out.println(response.toString());
-
-        for(Aggregation aggregation : response.getAggregations().asList()) {
-            System.out.println(aggregation.toString());
-        }
         return response;
     }
 }
