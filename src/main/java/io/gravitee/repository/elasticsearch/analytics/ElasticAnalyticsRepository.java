@@ -16,7 +16,13 @@
 package io.gravitee.repository.elasticsearch.analytics;
 
 import io.gravitee.repository.analytics.api.AnalyticsRepository;
-import io.gravitee.repository.analytics.model.Query;
+import io.gravitee.repository.analytics.query.HitsByApiKeyQuery;
+import io.gravitee.repository.analytics.query.HitsByApiQuery;
+import io.gravitee.repository.analytics.query.Query;
+import io.gravitee.repository.analytics.query.response.Response;
+import io.gravitee.repository.analytics.query.response.histogram.Bucket;
+import io.gravitee.repository.analytics.query.response.histogram.Data;
+import io.gravitee.repository.analytics.query.response.histogram.HistogramResponse;
 import org.elasticsearch.action.search.SearchRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.search.SearchType;
@@ -24,11 +30,20 @@ import org.elasticsearch.client.Client;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.RangeFilterBuilder;
+import org.elasticsearch.search.aggregations.Aggregation;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
+import org.elasticsearch.search.aggregations.bucket.histogram.DateHistogram;
+import org.elasticsearch.search.aggregations.bucket.terms.Terms;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
 import static org.elasticsearch.index.query.FilterBuilders.rangeFilter;
-import static org.elasticsearch.index.query.QueryBuilders.*;
+import static org.elasticsearch.index.query.QueryBuilders.filteredQuery;
+import static org.elasticsearch.index.query.QueryBuilders.termQuery;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.dateHistogram;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.terms;
 
@@ -47,58 +62,158 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
     private Client client;
 
     @Override
-    public Object query(Query query) throws Exception {
-        SearchRequestBuilder requestBuilder = client.prepareSearch("gravitee-*").setTypes("request");
-        requestBuilder.setSearchType(SearchType.COUNT);
-
-        QueryBuilder queryBuilder = null;
-
-        // First, set the query builder
-        if (query.filter() != null) {
-            switch(query.filter().type()) {
-                case API_KEY:
-                    queryBuilder = QueryBuilders.boolQuery().must(termQuery(FIELD_API_KEY, query.filter().value()));
-                    break;
-                case API_NAME:
-                    queryBuilder = QueryBuilders.boolQuery().must(termQuery(FIELD_API_NAME, query.filter().value()));
-                    break;
-            }
+    public <T extends Response> T query(Query<T> query) throws Exception {
+        if (query instanceof HitsByApiQuery) {
+            return (T) hitsByApi((HitsByApiQuery) query);
+        } else if (query instanceof HitsByApiKeyQuery) {
+            return (T) hitsByApiKey((HitsByApiKeyQuery) query);
         }
 
-        if (queryBuilder == null) {
-            queryBuilder = matchAllQuery();
+        return null;
+    }
+
+    private HistogramResponse hitsByApi(HitsByApiQuery query) {
+        SearchRequestBuilder requestBuilder = createRequestBuilder();
+
+        QueryBuilder queryBuilder;
+
+        if (query.api() != null) {
+            queryBuilder = QueryBuilders.boolQuery().must(termQuery(FIELD_API_NAME, query.api()));
+        } else {
+            queryBuilder = QueryBuilders.matchAllQuery();
         }
 
-        // Second, set the range query
-        RangeFilterBuilder rangeFilterBuilder = rangeFilter(FIELD_TIMESTAMP).from(query.dateRange().start()).to(query.dateRange().end());
+        RangeFilterBuilder rangeFilterBuilder = rangeFilter(FIELD_TIMESTAMP).from(query.range().start()).to(query.range().end());
 
         // Finally set the query
         requestBuilder.setQuery(filteredQuery(queryBuilder, rangeFilterBuilder));
 
         // Calculate aggregation
-        AggregationBuilder aggregationBuilder = terms("by_api").field(FIELD_API_NAME).size(0);
-        AggregationBuilder subAggregationbuilder = aggregationBuilder.subAggregation(
+        AggregationBuilder byApiAggregation = terms("by_api").field(FIELD_API_NAME).size(0);
+        AggregationBuilder byDateAggregation = dateHistogram("by_date")
+                .extendedBounds(query.range().start(), query.range().end())
+                .field(FIELD_TIMESTAMP)
+                .interval(query.interval().toMillis())
+                .minDocCount(0);
+        byApiAggregation.subAggregation(byDateAggregation);
+
+        switch (query.type()) {
+            case HITS_BY_APIKEY:
+                byDateAggregation.subAggregation(terms("by_apikey").field(FIELD_API_KEY).size(0));
+                break;
+            case HITS_BY_STATUS:
+                byDateAggregation.subAggregation(terms("by_status").field(FIELD_RESPONSE_STATUS).size(0));
+                break;
+            case HITS_BY_LATENCY:
+                byDateAggregation.subAggregation(terms("by_latency").field(FIELD_RESPONSE_TIME).size(0));
+                break;
+        }
+
+        // And set aggregation to the request
+        requestBuilder.addAggregation(byApiAggregation);
+
+        System.out.println(requestBuilder.toString());
+        // Get the response from ES
+        SearchResponse response = requestBuilder.get();
+
+        return toHistogramResponse(response);
+    }
+
+    private HistogramResponse hitsByApiKey(HitsByApiKeyQuery query) {
+        SearchRequestBuilder requestBuilder = createRequestBuilder();
+
+        QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(termQuery(FIELD_API_KEY, query.apiKey()));
+        RangeFilterBuilder rangeFilterBuilder = rangeFilter(FIELD_TIMESTAMP).from(query.range().start()).to(query.range().end());
+
+        // Finally set the query
+        requestBuilder.setQuery(filteredQuery(queryBuilder, rangeFilterBuilder));
+
+        // Calculate aggregation
+        AggregationBuilder aggregationBuilder = terms("by_apikey").field(FIELD_API_NAME).size(0);
+        AggregationBuilder subAggregationBuilder = aggregationBuilder.subAggregation(
                 dateHistogram("by_date")
-                        .extendedBounds(query.dateRange().start(), query.dateRange().end())
+                        .extendedBounds(query.range().start(), query.range().end())
                         .field(FIELD_TIMESTAMP)
                         .interval(query.interval().toMillis())
                         .minDocCount(0));
 
         switch (query.type()) {
-            case HITS_BY_LATENCY:
-                subAggregationbuilder.subAggregation(terms("by_latency").field(FIELD_RESPONSE_TIME).size(0));
-                break;
             case HITS_BY_STATUS:
-                subAggregationbuilder.subAggregation(terms("by_status").field(FIELD_RESPONSE_STATUS).size(0));
+                subAggregationBuilder.subAggregation(terms("by_status").field(FIELD_RESPONSE_STATUS).size(0));
+                break;
+            case HITS_BY_LATENCY:
+                subAggregationBuilder.subAggregation(terms("by_latency").field(FIELD_RESPONSE_TIME).size(0));
                 break;
         }
 
         // And set aggregation to the request
         requestBuilder.addAggregation(aggregationBuilder);
 
-        // And get the response from ES
+        // Get the response from ES
         SearchResponse response = requestBuilder.get();
 
-        return response;
+        return toHistogramResponse(response);
+    }
+
+    private SearchRequestBuilder createRequestBuilder() {
+        //TODO: Select indices according to the range from query
+        return client
+                .prepareSearch("gravitee-*")
+                .setTypes("request")
+                .setSearchType(SearchType.COUNT);
+    }
+
+    private HistogramResponse toHistogramResponse(SearchResponse searchResponse) {
+        HistogramResponse histogramResponse = new HistogramResponse();
+
+        System.out.println(searchResponse);
+
+        // First aggregation is always a term aggregation (by API or APIKey)
+        Terms terms = (Terms) searchResponse.getAggregations().iterator().next();
+
+        // Prepare data
+        for (Terms.Bucket bucket : terms.getBuckets()) {
+            Bucket histogramBucket = new Bucket(bucket.getKey());
+
+            DateHistogram dateHistogram = bucket.getAggregations().get("by_date");
+            for (DateHistogram.Bucket dateBucket : dateHistogram.getBuckets()) {
+                Iterator<Aggregation> subAggregationsIte = dateBucket.getAggregations().iterator();
+
+                if (subAggregationsIte.hasNext()) {
+                    while (subAggregationsIte.hasNext()) {
+                        Terms subAggregation = (Terms) subAggregationsIte.next();
+                        Map<String, List<Data>> bucketData = histogramBucket.data();
+
+                        for (Terms.Bucket subTermsBucket : subAggregation.getBuckets()) {
+                            List<Data> data = bucketData.get(subTermsBucket.getKey());
+                            if (data == null) {
+                                data = new ArrayList<>();
+                                bucketData.put(subTermsBucket.getKey(), data);
+                            }
+
+                            data.add(new Data(
+                                    dateBucket.getKeyAsDate().toDate().getTime(),
+                                    subTermsBucket.getDocCount()));
+                        }
+                    }
+                } else {
+                    Map<String, List<Data>> bucketData = histogramBucket.data();
+
+                        List<Data> data = bucketData.get("date");
+                        if (data == null) {
+                            data = new ArrayList<>();
+                            bucketData.put("date", data);
+                        }
+
+                        data.add(new Data(
+                                dateBucket.getKeyAsDate().toDate().getTime(),
+                                dateBucket.getDocCount()));
+                }
+            }
+
+            histogramResponse.hits().add(histogramBucket);
+        }
+
+        return histogramResponse;
     }
 }

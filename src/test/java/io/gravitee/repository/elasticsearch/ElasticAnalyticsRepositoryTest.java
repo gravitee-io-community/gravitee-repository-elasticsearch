@@ -16,6 +16,8 @@
 package io.gravitee.repository.elasticsearch;
 
 import io.gravitee.repository.analytics.api.AnalyticsRepository;
+import io.gravitee.repository.analytics.query.HitsByApiQuery;
+import io.gravitee.repository.analytics.query.response.histogram.HistogramResponse;
 import io.gravitee.repository.elasticsearch.analytics.spring.AnalyticsRepositoryConfiguration;
 import org.junit.Assert;
 import org.junit.Ignore;
@@ -25,9 +27,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
-import static io.gravitee.repository.analytics.query.IntervalQueryBuilder.minutes;
-import static io.gravitee.repository.analytics.query.PeriodQueryBuilder.lastHours;
-import static io.gravitee.repository.analytics.query.QueryBuilder.Query;
+import static io.gravitee.repository.analytics.query.DateRangeBuilder.lastDays;
+import static io.gravitee.repository.analytics.query.IntervalBuilder.hours;
+import static io.gravitee.repository.analytics.query.QueryBuilders.query;
 
 /**
  * @author David BRASSELY (brasseld at gmail.com)
@@ -44,8 +46,11 @@ public class ElasticAnalyticsRepositoryTest {
     public void test() throws Exception {
         Assert.assertNotNull(analyticsRepository);
 
-        Object response = analyticsRepository.query(Query().period(lastHours(2)).interval(minutes(10)).build());
+    //    HistogramResponse response1 = analyticsRepository.query(query().hitsByApi().period(lastDays(2)).interval(hours(12)).build());
+    //    HistogramResponse response2 = analyticsRepository.query(query().hitsByApi("api-weather").period(lastDays(2)).interval(hours(12)).build());
+        HistogramResponse response3 = analyticsRepository.query(query().hitsByApi().period(lastDays(2)).interval(hours(12)).type(HitsByApiQuery.Type.HITS_BY_STATUS).build());
+    //    HistogramResponse response4 = analyticsRepository.query(query().hitsByApiKey("xxxxxx").period(lastDays(2)).interval(hours(12)).build());
 
-        Assert.assertNotNull(response);
+        Assert.assertNotNull(response3);
     }
 }
