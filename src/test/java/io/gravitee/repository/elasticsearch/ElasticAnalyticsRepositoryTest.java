@@ -42,13 +42,12 @@ public class ElasticAnalyticsRepositoryTest {
     private AnalyticsRepository analyticsRepository;
 
     @Test
-    @Ignore
     public void test() throws Exception {
         Assert.assertNotNull(analyticsRepository);
 
     //    HistogramResponse response1 = analyticsRepository.query(query().hitsByApi().period(lastDays(2)).interval(hours(12)).build());
-    //    HistogramResponse response2 = analyticsRepository.query(query().hitsByApi("api-weather").period(lastDays(2)).interval(hours(12)).build());
-        HistogramResponse response3 = analyticsRepository.query(query().hitsByApi().period(lastDays(2)).interval(hours(12)).type(HitsByApiQuery.Type.HITS_BY_STATUS).build());
+        HistogramResponse response2 = analyticsRepository.query(query().hitsByApi("api-weather").period(lastDays(7)).interval(hours(12)).build());
+        HistogramResponse response3 = analyticsRepository.query(query().hitsByApi().period(lastDays(7)).interval(hours(12)).type(HitsByApiQuery.Type.HITS_BY_STATUS).build());
     //    HistogramResponse response4 = analyticsRepository.query(query().hitsByApiKey("xxxxxx").period(lastDays(2)).interval(hours(12)).build());
 
         Assert.assertNotNull(response3);

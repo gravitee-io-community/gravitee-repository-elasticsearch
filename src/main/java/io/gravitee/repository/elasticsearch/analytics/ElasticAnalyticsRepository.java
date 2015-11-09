@@ -15,6 +15,7 @@
  */
 package io.gravitee.repository.elasticsearch.analytics;
 
+import io.gravitee.repository.analytics.AnalyticsException;
 import io.gravitee.repository.analytics.api.AnalyticsRepository;
 import io.gravitee.repository.analytics.query.HitsByApiKeyQuery;
 import io.gravitee.repository.analytics.query.HitsByApiQuery;
@@ -23,6 +24,7 @@ import io.gravitee.repository.analytics.query.response.Response;
 import io.gravitee.repository.analytics.query.response.histogram.Bucket;
 import io.gravitee.repository.analytics.query.response.histogram.Data;
 import io.gravitee.repository.analytics.query.response.histogram.HistogramResponse;
+import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.action.search.SearchRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.search.SearchType;
@@ -34,6 +36,8 @@ import org.elasticsearch.search.aggregations.Aggregation;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
 import org.elasticsearch.search.aggregations.bucket.histogram.DateHistogram;
 import org.elasticsearch.search.aggregations.bucket.terms.Terms;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.ArrayList;
@@ -52,6 +56,11 @@ import static org.elasticsearch.search.aggregations.AggregationBuilders.terms;
  */
 public class ElasticAnalyticsRepository implements AnalyticsRepository {
 
+    /**
+     * Logger.
+     */
+    private final Logger logger = LoggerFactory.getLogger(ElasticAnalyticsRepository.class);
+
     private final static String FIELD_API_NAME = "api-name";
     private final static String FIELD_API_KEY = "api-key";
     private final static String FIELD_RESPONSE_STATUS = "status";
@@ -62,7 +71,7 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
     private Client client;
 
     @Override
-    public <T extends Response> T query(Query<T> query) throws Exception {
+    public <T extends Response> T query(Query<T> query) throws AnalyticsException {
         if (query instanceof HitsByApiQuery) {
             return (T) hitsByApi((HitsByApiQuery) query);
         } else if (query instanceof HitsByApiKeyQuery) {
@@ -72,51 +81,55 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
         return null;
     }
 
-    private HistogramResponse hitsByApi(HitsByApiQuery query) {
-        SearchRequestBuilder requestBuilder = createRequestBuilder();
+    private HistogramResponse hitsByApi(HitsByApiQuery query) throws AnalyticsException {
+        try {
+            SearchRequestBuilder requestBuilder = createRequestBuilder();
 
-        QueryBuilder queryBuilder;
+            QueryBuilder queryBuilder;
 
-        if (query.api() != null) {
-            queryBuilder = QueryBuilders.boolQuery().must(termQuery(FIELD_API_NAME, query.api()));
-        } else {
-            queryBuilder = QueryBuilders.matchAllQuery();
+            if (query.api() != null) {
+                queryBuilder = QueryBuilders.boolQuery().must(termQuery(FIELD_API_NAME, query.api()));
+            } else {
+                queryBuilder = QueryBuilders.matchAllQuery();
+            }
+
+            RangeFilterBuilder rangeFilterBuilder = rangeFilter(FIELD_TIMESTAMP).from(query.range().start()).to(query.range().end());
+
+            // Finally set the query
+            requestBuilder.setQuery(filteredQuery(queryBuilder, rangeFilterBuilder));
+
+            // Calculate aggregation
+            AggregationBuilder byApiAggregation = terms("by_api").field(FIELD_API_NAME).size(0);
+            AggregationBuilder byDateAggregation = dateHistogram("by_date")
+                    .extendedBounds(query.range().start(), query.range().end())
+                    .field(FIELD_TIMESTAMP)
+                    .interval(query.interval().toMillis())
+                    .minDocCount(0);
+            byApiAggregation.subAggregation(byDateAggregation);
+
+            switch (query.type()) {
+                case HITS_BY_APIKEY:
+                    byDateAggregation.subAggregation(terms("by_apikey").field(FIELD_API_KEY).size(0));
+                    break;
+                case HITS_BY_STATUS:
+                    byDateAggregation.subAggregation(terms("by_status").field(FIELD_RESPONSE_STATUS).size(0));
+                    break;
+                case HITS_BY_LATENCY:
+                    byDateAggregation.subAggregation(terms("by_latency").field(FIELD_RESPONSE_TIME).size(0));
+                    break;
+            }
+
+            // And set aggregation to the request
+            requestBuilder.addAggregation(byApiAggregation);
+
+            // Get the response from ES
+            SearchResponse response = requestBuilder.get();
+
+            return toHistogramResponse(response);
+        } catch (ElasticsearchException ese) {
+            logger.error("An error occurs while looking for analytics with Elasticsearch", ese);
+            throw new AnalyticsException("An error occurs while looking for analytics with Elasticsearch", ese);
         }
-
-        RangeFilterBuilder rangeFilterBuilder = rangeFilter(FIELD_TIMESTAMP).from(query.range().start()).to(query.range().end());
-
-        // Finally set the query
-        requestBuilder.setQuery(filteredQuery(queryBuilder, rangeFilterBuilder));
-
-        // Calculate aggregation
-        AggregationBuilder byApiAggregation = terms("by_api").field(FIELD_API_NAME).size(0);
-        AggregationBuilder byDateAggregation = dateHistogram("by_date")
-                .extendedBounds(query.range().start(), query.range().end())
-                .field(FIELD_TIMESTAMP)
-                .interval(query.interval().toMillis())
-                .minDocCount(0);
-        byApiAggregation.subAggregation(byDateAggregation);
-
-        switch (query.type()) {
-            case HITS_BY_APIKEY:
-                byDateAggregation.subAggregation(terms("by_apikey").field(FIELD_API_KEY).size(0));
-                break;
-            case HITS_BY_STATUS:
-                byDateAggregation.subAggregation(terms("by_status").field(FIELD_RESPONSE_STATUS).size(0));
-                break;
-            case HITS_BY_LATENCY:
-                byDateAggregation.subAggregation(terms("by_latency").field(FIELD_RESPONSE_TIME).size(0));
-                break;
-        }
-
-        // And set aggregation to the request
-        requestBuilder.addAggregation(byApiAggregation);
-
-        System.out.println(requestBuilder.toString());
-        // Get the response from ES
-        SearchResponse response = requestBuilder.get();
-
-        return toHistogramResponse(response);
     }
 
     private HistogramResponse hitsByApiKey(HitsByApiKeyQuery query) {
@@ -166,8 +179,6 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
     private HistogramResponse toHistogramResponse(SearchResponse searchResponse) {
         HistogramResponse histogramResponse = new HistogramResponse();
 
-        System.out.println(searchResponse);
-
         // First aggregation is always a term aggregation (by API or APIKey)
         Terms terms = (Terms) searchResponse.getAggregations().iterator().next();
 
@@ -177,9 +188,11 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
 
             DateHistogram dateHistogram = bucket.getAggregations().get("by_date");
             for (DateHistogram.Bucket dateBucket : dateHistogram.getBuckets()) {
-                Iterator<Aggregation> subAggregationsIte = dateBucket.getAggregations().iterator();
+                histogramResponse.timestamps().add(dateBucket.getKeyAsDate().toDate().getTime());
 
+                Iterator<Aggregation> subAggregationsIte = dateBucket.getAggregations().iterator();
                 if (subAggregationsIte.hasNext()) {
+
                     while (subAggregationsIte.hasNext()) {
                         Terms subAggregation = (Terms) subAggregationsIte.next();
                         Map<String, List<Data>> bucketData = histogramBucket.data();
@@ -202,7 +215,7 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
                         List<Data> data = bucketData.get("date");
                         if (data == null) {
                             data = new ArrayList<>();
-                            bucketData.put("date", data);
+                            bucketData.put("hits", data);
                         }
 
                         data.add(new Data(
@@ -211,7 +224,7 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
                 }
             }
 
-            histogramResponse.hits().add(histogramBucket);
+            histogramResponse.values().add(histogramBucket);
         }
 
         return histogramResponse;
