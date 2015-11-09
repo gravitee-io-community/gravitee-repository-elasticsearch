@@ -177,6 +177,8 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
     }
 
     private HistogramResponse toHistogramResponse(SearchResponse searchResponse) {
+        System.out.println(searchResponse.toString());
+
         HistogramResponse histogramResponse = new HistogramResponse();
 
         // First aggregation is always a term aggregation (by API or APIKey)
@@ -212,7 +214,7 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
                 } else {
                     Map<String, List<Data>> bucketData = histogramBucket.data();
 
-                        List<Data> data = bucketData.get("date");
+                        List<Data> data = bucketData.get("hits");
                         if (data == null) {
                             data = new ArrayList<>();
                             bucketData.put("hits", data);
