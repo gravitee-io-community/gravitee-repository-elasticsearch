@@ -162,8 +162,12 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
         // And set aggregation to the request
         requestBuilder.addAggregation(aggregationBuilder);
 
+        logger.debug("ES Request: {}", requestBuilder.toString());
+
         // Get the response from ES
         SearchResponse response = requestBuilder.get();
+
+        logger.debug("ES Response: {}", requestBuilder.toString());
 
         return toHistogramResponse(response);
     }
@@ -177,8 +181,6 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
     }
 
     private HistogramResponse toHistogramResponse(SearchResponse searchResponse) {
-        System.out.println(searchResponse.toString());
-
         HistogramResponse histogramResponse = new HistogramResponse();
 
         // First aggregation is always a term aggregation (by API or APIKey)
