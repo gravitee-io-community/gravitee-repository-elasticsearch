@@ -41,6 +41,7 @@ public class ElasticAnalyticsRepositoryTest {
     @Autowired
     private AnalyticsRepository analyticsRepository;
 
+    @Ignore
     @Test
     public void test() throws Exception {
         Assert.assertNotNull(analyticsRepository);
