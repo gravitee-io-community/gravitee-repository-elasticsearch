@@ -33,6 +33,7 @@
 
 	<properties>
 		<es.version>1.6.0</es.version>
+		<gravitee-repository.version>0.3.0-SNAPSHOT</gravitee-repository.version>
 	</properties>
 
 	<dependencies>
@@ -40,7 +41,7 @@
 		<dependency>
 			<groupId>io.gravitee.repository</groupId>
 			<artifactId>gravitee-repository</artifactId>
-			<version>0.3.0-SNAPSHOT</version>
+			<version>${gravitee-repository.version}</version>
 		</dependency>
 
 		<!-- Elasticsearch dependency -->
