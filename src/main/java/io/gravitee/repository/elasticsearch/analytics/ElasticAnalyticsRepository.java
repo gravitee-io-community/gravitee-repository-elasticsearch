@@ -65,6 +65,8 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
     private final static String FIELD_API_KEY = "api-key";
     private final static String FIELD_RESPONSE_STATUS = "status";
     private final static String FIELD_RESPONSE_TIME = "response-time";
+    private final static String FIELD_RESPONSE_CONTENT_LENGTH = "response-content-length";
+
     private final static String FIELD_TIMESTAMP = "@timestamp";
 
     @Autowired
@@ -117,6 +119,8 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
                 case HITS_BY_LATENCY:
                     byDateAggregation.subAggregation(terms("by_latency").field(FIELD_RESPONSE_TIME).size(0));
                     break;
+                case HITS_BY_PAYLOAD_SIZE:
+                    byDateAggregation.subAggregation(terms("by_payload_size").field(FIELD_RESPONSE_CONTENT_LENGTH).size(0));
             }
 
             // And set aggregation to the request
