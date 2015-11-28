@@ -15,14 +15,21 @@
  */
 package io.gravitee.repository.elasticsearch.analytics.spring;
 
+import io.gravitee.repository.elasticsearch.analytics.configuration.ElasticConfiguration;
+import io.gravitee.repository.elasticsearch.analytics.model.HostAddress;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.common.settings.ImmutableSettings;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.InetSocketTransportAddress;
+import org.elasticsearch.node.Node;
+import org.elasticsearch.node.NodeBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.AbstractFactoryBean;
+
+import java.util.List;
 
 /**
  * @author David BRASSELY (brasseld at gmail.com)
@@ -31,18 +38,49 @@ public class ElasticClientFactory extends AbstractFactoryBean<Client> {
 
     private final Logger LOGGER = LoggerFactory.getLogger(ElasticClientFactory.class);
 
+    @Autowired
+    private ElasticConfiguration configuration;
+
     @Override
-    public Class<?> getObjectType() {
+    public Class<Client> getObjectType() {
         return Client.class;
     }
 
     @Override
     protected Client createInstance() throws Exception {
-        Settings settings = ImmutableSettings.settingsBuilder()
-                .put("cluster.name", "elasticsearch").build();
-        TransportClient client = new TransportClient(settings);
-        client.addTransportAddress(new InetSocketTransportAddress("localhost", 9300));
+        switch (configuration.getProtocol()) {
+            case TRANSPORT:
+                return createTransportClient();
+            case NODE:
+                return createNodeClient();
+            default:
+                LOGGER.error("Unsupported protocol [{}] for elastic client", configuration.getProtocol());
+                throw new IllegalStateException(String.format("Unsupported protocol [%s] for elastic client", configuration.getProtocol()));
+        }
+    }
 
-        return client;
+    private Client createTransportClient() {
+        Settings settings = ImmutableSettings.settingsBuilder().put("cluster.name", configuration.getClusterName()).build();
+        TransportClient transportClient = new TransportClient(settings);
+
+        List<HostAddress> adresses = configuration.getHostsAddresses();
+
+        for (HostAddress address : adresses) {
+            transportClient.addTransportAddress(new InetSocketTransportAddress(address.getHostname(), address.getPort()));
+        }
+
+        return transportClient;
+    }
+
+    private Client createNodeClient() {
+        Settings settings = ImmutableSettings.settingsBuilder()
+                .put("cluster.name", configuration.getClusterName())
+                .put("gateway.type","none")
+                // .put("index.number_of_shards",numberOfShards)
+                // .put("index.number_of_replicas",0)
+                .build();
+
+        Node node = NodeBuilder.nodeBuilder().settings(settings).client(true).node();
+        return node.client();
     }
 }

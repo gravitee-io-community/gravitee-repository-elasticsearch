@@ -17,6 +17,7 @@ package io.gravitee.repository.elasticsearch.analytics.spring;
 
 import io.gravitee.repository.analytics.api.AnalyticsRepository;
 import io.gravitee.repository.elasticsearch.analytics.ElasticAnalyticsRepository;
+import io.gravitee.repository.elasticsearch.analytics.configuration.ElasticConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -29,6 +30,11 @@ public class AnalyticsRepositoryConfiguration {
     @Bean
     public ElasticClientFactory elasticClientFactory() {
         return new ElasticClientFactory();
+    }
+
+    @Bean
+    public ElasticConfiguration elasticConfiguration() {
+        return new ElasticConfiguration();
     }
 
     @Bean
