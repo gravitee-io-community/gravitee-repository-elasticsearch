@@ -53,4 +53,10 @@ public class ElasticAnalyticsRepositoryTest {
 
         Assert.assertNotNull(response3);
     }
+
+    @Test
+    @Ignore
+    public void health() throws Exception {
+        analyticsRepository.query("api-weather", 1000 * 60 * 5, 1448781600000l, 1448781600000l);
+    }
 }

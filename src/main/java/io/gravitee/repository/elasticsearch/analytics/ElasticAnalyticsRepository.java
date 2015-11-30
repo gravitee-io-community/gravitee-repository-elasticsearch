@@ -20,6 +20,7 @@ import io.gravitee.repository.analytics.api.AnalyticsRepository;
 import io.gravitee.repository.analytics.query.HitsByApiKeyQuery;
 import io.gravitee.repository.analytics.query.HitsByApiQuery;
 import io.gravitee.repository.analytics.query.Query;
+import io.gravitee.repository.analytics.query.response.HealthResponse;
 import io.gravitee.repository.analytics.query.response.Response;
 import io.gravitee.repository.analytics.query.response.histogram.Bucket;
 import io.gravitee.repository.analytics.query.response.histogram.Data;
@@ -40,10 +41,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static org.elasticsearch.index.query.FilterBuilders.rangeFilter;
 import static org.elasticsearch.index.query.QueryBuilders.filteredQuery;
@@ -83,9 +81,42 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
         return null;
     }
 
+    @Override
+    public HealthResponse query(String api, long interval, long from, long to) throws AnalyticsException {
+        try {
+            SearchRequestBuilder requestBuilder = createRequestBuilder("health");
+
+            QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(termQuery("api", api));
+
+            RangeFilterBuilder rangeFilterBuilder = rangeFilter(FIELD_TIMESTAMP).from(from).to(to);
+
+            // Finally set the query
+            requestBuilder.setQuery(filteredQuery(queryBuilder, rangeFilterBuilder));
+
+            // Calculate aggregation
+            AggregationBuilder byDateAggregation = dateHistogram("by_date")
+                    .extendedBounds(from, to)
+                    .field(FIELD_TIMESTAMP)
+                    .interval(interval);
+//                    .minDocCount(0);
+            byDateAggregation.subAggregation(terms("by_status").field(FIELD_RESPONSE_STATUS).size(0));
+
+            // And set aggregation to the request
+            requestBuilder.addAggregation(byDateAggregation);
+
+            // Get the response from ES
+            SearchResponse response = requestBuilder.get();
+
+            return toHealthResponse(response);
+        } catch (ElasticsearchException ese) {
+            logger.error("An error occurs while looking for analytics with Elasticsearch", ese);
+            throw new AnalyticsException("An error occurs while looking for analytics with Elasticsearch", ese);
+        }
+    }
+
     private HistogramResponse hitsByApi(HitsByApiQuery query) throws AnalyticsException {
         try {
-            SearchRequestBuilder requestBuilder = createRequestBuilder();
+            SearchRequestBuilder requestBuilder = createRequestBuilder("request");
 
             QueryBuilder queryBuilder;
 
@@ -137,7 +168,7 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
     }
 
     private HistogramResponse hitsByApiKey(HitsByApiKeyQuery query) {
-        SearchRequestBuilder requestBuilder = createRequestBuilder();
+        SearchRequestBuilder requestBuilder = createRequestBuilder("request");
 
         QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(termQuery(FIELD_API_KEY, query.apiKey()));
         RangeFilterBuilder rangeFilterBuilder = rangeFilter(FIELD_TIMESTAMP).from(query.range().start()).to(query.range().end());
@@ -176,11 +207,11 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
         return toHistogramResponse(response);
     }
 
-    private SearchRequestBuilder createRequestBuilder() {
+    private SearchRequestBuilder createRequestBuilder(String type) {
         //TODO: Select indices according to the range from query
         return client
                 .prepareSearch("gravitee-*")
-                .setTypes("request")
+                .setTypes(type)
                 .setSearchType(SearchType.COUNT);
     }
 
@@ -236,5 +267,39 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
         }
 
         return histogramResponse;
+    }
+
+    private HealthResponse toHealthResponse(SearchResponse searchResponse) {
+        HealthResponse healthResponse = new HealthResponse();
+
+        // First aggregation is always a date histogram aggregation
+        DateHistogram histogram = searchResponse.getAggregations().get("by_date");
+
+        Map<Integer, long[]> values = new HashMap<>();
+        long [] timestamps = new long[histogram.getBuckets().size()];
+
+        // Prepare data
+        int idx = 0;
+        for (DateHistogram.Bucket bucket : histogram.getBuckets()) {
+            timestamps[idx] = bucket.getKeyAsDate().toDate().getTime();
+
+            Terms terms = bucket.getAggregations().get("by_status");
+
+            for (Terms.Bucket termBucket : terms.getBuckets()) {
+                long [] valuesByStatus = values.getOrDefault(
+                        Integer.parseInt(termBucket.getKey()), new long[timestamps.length]);
+
+                valuesByStatus[idx] = termBucket.getDocCount();
+
+                values.put(Integer.parseInt(termBucket.getKey()), valuesByStatus);
+            }
+
+            idx++;
+        }
+
+        healthResponse.timestamps(timestamps);
+        healthResponse.buckets(values);
+
+        return healthResponse;
     }
 }
