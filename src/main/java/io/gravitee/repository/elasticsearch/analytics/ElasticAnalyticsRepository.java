@@ -59,7 +59,7 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
      */
     private final Logger logger = LoggerFactory.getLogger(ElasticAnalyticsRepository.class);
 
-    private final static String FIELD_API_NAME = "api-name";
+    private final static String FIELD_API_NAME = "api";
     private final static String FIELD_API_KEY = "api-key";
     private final static String FIELD_RESPONSE_STATUS = "status";
     private final static String FIELD_RESPONSE_TIME = "response-time";
