@@ -32,7 +32,7 @@
 	<name>Gravitee IO - API Management - Repository Elasticsearch</name>
 
 	<properties>
-		<es.version>1.6.0</es.version>
+		<es.version>1.7.5</es.version>
 		<gravitee-repository.version>0.5.0</gravitee-repository.version>
 	</properties>
 
