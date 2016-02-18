@@ -218,6 +218,10 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
     private HistogramResponse toHistogramResponse(SearchResponse searchResponse) {
         HistogramResponse histogramResponse = new HistogramResponse();
 
+        if (searchResponse.getAggregations() == null) {
+            return histogramResponse;
+        }
+
         // First aggregation is always a term aggregation (by API or APIKey)
         Terms terms = (Terms) searchResponse.getAggregations().iterator().next();
 
@@ -271,6 +275,10 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
 
     private HealthResponse toHealthResponse(SearchResponse searchResponse) {
         HealthResponse healthResponse = new HealthResponse();
+
+        if (searchResponse.getAggregations() == null) {
+            return healthResponse;
+        }
 
         // First aggregation is always a date histogram aggregation
         DateHistogram histogram = searchResponse.getAggregations().get("by_date");
