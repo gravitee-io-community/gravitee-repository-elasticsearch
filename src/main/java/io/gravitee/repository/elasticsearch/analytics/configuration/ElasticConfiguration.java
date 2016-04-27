@@ -39,19 +39,19 @@ public class ElasticConfiguration {
 	/**
 	 *  Client communication protocol. 
 	 */
-	@Value("${analytics.elastic.protocol:TRANSPORT}")
+	@Value("${analytics.elasticsearch.protocol:TRANSPORT}")
 	private Protocol protocol;
 	
 	/**
 	 * Cluster name. Used only for node protocol
 	 */
-	@Value("${analytics.elastic.cluster.name:elasticsearch}")
+	@Value("${analytics.elasticsearch.cluster.name:elasticsearch}")
 	private String clusterName;
 	
 	/**
 	 * Prefix index name. 
 	 */
-	@Value("${analytics.elastic.index.name:gravitee}")
+	@Value("${analytics.elasticsearch.index.name:gravitee}")
 	private String indexName;
 
 	/**
@@ -75,16 +75,9 @@ public class ElasticConfiguration {
 		}
 		return hostsAddresses;
 	}
-	
-	public List<String> getHostsUrls() {
-		if(hostsUrls == null){
-			hostsUrls = initializeHostsUrls();
-		}
-		return hostsUrls;
-	}
 
 	private List<HostAddress> initializeHostsAddresses(){
-		String key = String.format("analytics.elastic.hosts[%s]", 0);
+		String key = String.format("analytics.elasticsearch.hosts[%s]", 0);
 		List<HostAddress> res = new ArrayList<>();
 		
 		while (environment.containsProperty(key)) {
@@ -101,28 +94,12 @@ public class ElasticConfiguration {
 				res.add(new HostAddress(serializedHost.trim(), protocol.getDefaultPort()));
 			}
 			
-			key = String.format("analytics.elastic.hosts[%s]", res.size());
+			key = String.format("analytics.elasticsearch.hosts[%s]", res.size());
 		}
 		
 		// Use default host if required
 		if(res.isEmpty()){
 			res.add(new HostAddress("localhost", protocol.getDefaultPort()));
-		}
-		return res;
-	}
-	
-	public List<String> initializeHostsUrls() {
-		String key = String.format("analytics.elastic.hosts[%s]", 0);
-		List<String> res = new ArrayList<>();
-		
-		while (environment.containsProperty(key)) {
-			res.add(environment.getProperty(key));
-			key = String.format("analytics.elastic.hosts[%s]", res.size());
-		}
-		
-		// Use default host if required
-		if(res.isEmpty()){
-			res.add("http://localhost:9200/");
 		}
 		return res;
 	}
