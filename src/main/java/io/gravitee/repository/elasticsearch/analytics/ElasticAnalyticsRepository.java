@@ -32,19 +32,19 @@ import org.elasticsearch.action.search.SearchType;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
-import org.elasticsearch.index.query.RangeFilterBuilder;
+import org.elasticsearch.index.query.RangeQueryBuilder;
 import org.elasticsearch.search.aggregations.Aggregation;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
-import org.elasticsearch.search.aggregations.bucket.histogram.DateHistogram;
+import org.elasticsearch.search.aggregations.bucket.histogram.Histogram;
 import org.elasticsearch.search.aggregations.bucket.terms.Terms;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.*;
 
-import static org.elasticsearch.index.query.FilterBuilders.rangeFilter;
-import static org.elasticsearch.index.query.QueryBuilders.filteredQuery;
+import static org.elasticsearch.index.query.QueryBuilders.boolQuery;
 import static org.elasticsearch.index.query.QueryBuilders.termQuery;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.dateHistogram;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.terms;
@@ -86,12 +86,12 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
         try {
             SearchRequestBuilder requestBuilder = createRequestBuilder("health");
 
-            QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(termQuery("api", api));
+            QueryBuilder queryBuilder = boolQuery().must(termQuery("api", api));
 
-            RangeFilterBuilder rangeFilterBuilder = rangeFilter(FIELD_TIMESTAMP).from(from).to(to);
+            final RangeQueryBuilder rangeQueryBuilder = QueryBuilders.rangeQuery(FIELD_TIMESTAMP).from(from).to(to);
 
             // Finally set the query
-            requestBuilder.setQuery(filteredQuery(queryBuilder, rangeFilterBuilder));
+            requestBuilder.setQuery(boolQuery().filter(queryBuilder).filter(rangeQueryBuilder));
 
             // Calculate aggregation
             AggregationBuilder byDateAggregation = dateHistogram("by_date")
@@ -121,15 +121,15 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
             QueryBuilder queryBuilder;
 
             if (query.api() != null) {
-                queryBuilder = QueryBuilders.boolQuery().must(termQuery(FIELD_API_NAME, query.api()));
+                queryBuilder = boolQuery().must(termQuery(FIELD_API_NAME, query.api()));
             } else {
                 queryBuilder = QueryBuilders.matchAllQuery();
             }
 
-            RangeFilterBuilder rangeFilterBuilder = rangeFilter(FIELD_TIMESTAMP).from(query.range().start()).to(query.range().end());
+            final RangeQueryBuilder rangeQueryBuilder = QueryBuilders.rangeQuery(FIELD_TIMESTAMP).from(query.range().start()).to(query.range().end());
 
             // Finally set the query
-            requestBuilder.setQuery(filteredQuery(queryBuilder, rangeFilterBuilder));
+            requestBuilder.setQuery(boolQuery().filter(queryBuilder).filter(rangeQueryBuilder));
 
             // Calculate aggregation
             AggregationBuilder byApiAggregation = terms("by_api").field(FIELD_API_NAME).size(0);
@@ -170,11 +170,12 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
     private HistogramResponse hitsByApiKey(HitsByApiKeyQuery query) {
         SearchRequestBuilder requestBuilder = createRequestBuilder("request");
 
-        QueryBuilder queryBuilder = QueryBuilders.boolQuery().must(termQuery(FIELD_API_KEY, query.apiKey()));
-        RangeFilterBuilder rangeFilterBuilder = rangeFilter(FIELD_TIMESTAMP).from(query.range().start()).to(query.range().end());
+        QueryBuilder queryBuilder = boolQuery().must(termQuery(FIELD_API_KEY, query.apiKey()));
+
+        final RangeQueryBuilder rangeQueryBuilder = QueryBuilders.rangeQuery(FIELD_TIMESTAMP).from(query.range().start()).to(query.range().end());
 
         // Finally set the query
-        requestBuilder.setQuery(filteredQuery(queryBuilder, rangeFilterBuilder));
+        requestBuilder.setQuery(boolQuery().filter(queryBuilder).filter(rangeQueryBuilder));
 
         // Calculate aggregation
         AggregationBuilder aggregationBuilder = terms("by_apikey").field(FIELD_API_NAME).size(0);
@@ -227,11 +228,12 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
 
         // Prepare data
         for (Terms.Bucket bucket : terms.getBuckets()) {
-            Bucket histogramBucket = new Bucket(bucket.getKey());
+            Bucket histogramBucket = new Bucket(bucket.getKeyAsString());
 
-            DateHistogram dateHistogram = bucket.getAggregations().get("by_date");
-            for (DateHistogram.Bucket dateBucket : dateHistogram.getBuckets()) {
-                histogramResponse.timestamps().add(dateBucket.getKeyAsDate().toDate().getTime());
+            Histogram dateHistogram = bucket.getAggregations().get("by_date");
+            for (Histogram.Bucket dateBucket : dateHistogram.getBuckets()) {
+                final long keyAsDate = ((DateTime) dateBucket.getKey()).getMillis();
+                histogramResponse.timestamps().add(keyAsDate);
 
                 Iterator<Aggregation> subAggregationsIte = dateBucket.getAggregations().iterator();
                 if (subAggregationsIte.hasNext()) {
@@ -241,15 +243,13 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
                         Map<String, List<Data>> bucketData = histogramBucket.data();
 
                         for (Terms.Bucket subTermsBucket : subAggregation.getBuckets()) {
-                            List<Data> data = bucketData.get(subTermsBucket.getKey());
+                            List<Data> data = bucketData.get(subTermsBucket.getKeyAsString());
                             if (data == null) {
                                 data = new ArrayList<>();
-                                bucketData.put(subTermsBucket.getKey(), data);
+                                bucketData.put(subTermsBucket.getKeyAsString(), data);
                             }
 
-                            data.add(new Data(
-                                    dateBucket.getKeyAsDate().toDate().getTime(),
-                                    subTermsBucket.getDocCount()));
+                            data.add(new Data(keyAsDate, subTermsBucket.getDocCount()));
                         }
                     }
                 } else {
@@ -261,9 +261,7 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
                             bucketData.put("hits", data);
                         }
 
-                        data.add(new Data(
-                                dateBucket.getKeyAsDate().toDate().getTime(),
-                                dateBucket.getDocCount()));
+                        data.add(new Data(keyAsDate, dateBucket.getDocCount()));
                 }
             }
 
@@ -281,25 +279,25 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
         }
 
         // First aggregation is always a date histogram aggregation
-        DateHistogram histogram = searchResponse.getAggregations().get("by_date");
+        Histogram histogram = searchResponse.getAggregations().get("by_date");
 
         Map<Integer, long[]> values = new HashMap<>();
         long [] timestamps = new long[histogram.getBuckets().size()];
 
         // Prepare data
         int idx = 0;
-        for (DateHistogram.Bucket bucket : histogram.getBuckets()) {
-            timestamps[idx] = bucket.getKeyAsDate().toDate().getTime();
+        for (Histogram.Bucket bucket : histogram.getBuckets()) {
+            timestamps[idx] = ((DateTime) bucket.getKey()).getMillis();
 
             Terms terms = bucket.getAggregations().get("by_status");
 
             for (Terms.Bucket termBucket : terms.getBuckets()) {
                 long [] valuesByStatus = values.getOrDefault(
-                        Integer.parseInt(termBucket.getKey()), new long[timestamps.length]);
+                        Integer.parseInt(termBucket.getKeyAsString()), new long[timestamps.length]);
 
                 valuesByStatus[idx] = termBucket.getDocCount();
 
-                values.put(Integer.parseInt(termBucket.getKey()), valuesByStatus);
+                values.put(Integer.parseInt(termBucket.getKeyAsString()), valuesByStatus);
             }
 
             idx++;
