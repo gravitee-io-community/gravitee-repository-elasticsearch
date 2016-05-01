@@ -19,7 +19,6 @@ import io.gravitee.repository.elasticsearch.analytics.configuration.ElasticConfi
 import io.gravitee.repository.elasticsearch.analytics.model.HostAddress;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.client.transport.TransportClient;
-import org.elasticsearch.common.settings.ImmutableSettings;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.InetSocketTransportAddress;
 import org.elasticsearch.node.Node;
@@ -29,6 +28,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.AbstractFactoryBean;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.List;
 
 /**
@@ -60,20 +61,25 @@ public class ElasticClientFactory extends AbstractFactoryBean<Client> {
     }
 
     private Client createTransportClient() {
-        Settings settings = ImmutableSettings.settingsBuilder().put("cluster.name", configuration.getClusterName()).build();
-        TransportClient transportClient = new TransportClient(settings);
+        Settings settings = Settings.settingsBuilder().put("cluster.name", configuration.getClusterName()).build();
+        TransportClient transportClient = TransportClient.builder().settings(settings).build();
 
         List<HostAddress> adresses = configuration.getHostsAddresses();
 
         for (HostAddress address : adresses) {
-            transportClient.addTransportAddress(new InetSocketTransportAddress(address.getHostname(), address.getPort()));
+            try {
+                transportClient.addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName(address.getHostname()), address.getPort()));
+            } catch (final UnknownHostException uhe) {
+                LOGGER.error("Invalid hostname [{}]", address.getHostname());
+                throw new IllegalStateException(String.format("Invalid hostname [%s]", address.getHostname()), uhe);
+            }
         }
 
         return transportClient;
     }
 
     private Client createNodeClient() {
-        Settings settings = ImmutableSettings.settingsBuilder()
+        Settings settings = Settings.settingsBuilder()
                 .put("cluster.name", configuration.getClusterName())
                 .put("gateway.type","none")
                 // .put("index.number_of_shards",numberOfShards)
