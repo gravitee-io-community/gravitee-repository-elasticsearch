@@ -67,6 +67,8 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
 
     private final static String FIELD_TIMESTAMP = "@timestamp";
 
+    private final static String FIELD_HEALTH_RESPONSE_SUCCESS = "success";
+
     @Autowired
     private Client client;
 
@@ -99,7 +101,7 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
                     .field(FIELD_TIMESTAMP)
                     .interval(interval);
 //                    .minDocCount(0);
-            byDateAggregation.subAggregation(terms("by_status").field(FIELD_RESPONSE_STATUS).size(0));
+            byDateAggregation.subAggregation(terms("by_result").field(FIELD_HEALTH_RESPONSE_SUCCESS).size(0));
 
             // And set aggregation to the request
             requestBuilder.addAggregation(byDateAggregation);
@@ -281,7 +283,7 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
         // First aggregation is always a date histogram aggregation
         Histogram histogram = searchResponse.getAggregations().get("by_date");
 
-        Map<Integer, long[]> values = new HashMap<>();
+        Map<Boolean, long[]> values = new HashMap<>(2);
         long [] timestamps = new long[histogram.getBuckets().size()];
 
         // Prepare data
@@ -289,15 +291,15 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
         for (Histogram.Bucket bucket : histogram.getBuckets()) {
             timestamps[idx] = ((DateTime) bucket.getKey()).getMillis();
 
-            Terms terms = bucket.getAggregations().get("by_status");
+            Terms terms = bucket.getAggregations().get("by_result");
 
             for (Terms.Bucket termBucket : terms.getBuckets()) {
                 long [] valuesByStatus = values.getOrDefault(
-                        Integer.parseInt(termBucket.getKeyAsString()), new long[timestamps.length]);
+                        Integer.parseInt(termBucket.getKeyAsString()) == 1, new long[timestamps.length]);
 
                 valuesByStatus[idx] = termBucket.getDocCount();
 
-                values.put(Integer.parseInt(termBucket.getKeyAsString()), valuesByStatus);
+                values.put(Integer.parseInt(termBucket.getKeyAsString()) == 1, valuesByStatus);
             }
 
             idx++;
