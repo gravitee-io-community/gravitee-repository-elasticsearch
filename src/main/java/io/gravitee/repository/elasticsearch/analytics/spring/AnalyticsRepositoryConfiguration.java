@@ -18,6 +18,8 @@ package io.gravitee.repository.elasticsearch.analytics.spring;
 import io.gravitee.repository.analytics.api.AnalyticsRepository;
 import io.gravitee.repository.elasticsearch.analytics.ElasticAnalyticsRepository;
 import io.gravitee.repository.elasticsearch.analytics.configuration.ElasticConfiguration;
+import io.gravitee.repository.elasticsearch.monitoring.ElasticMonitoringRepository;
+import io.gravitee.repository.monitoring.MonitoringRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -40,5 +42,10 @@ public class AnalyticsRepositoryConfiguration {
     @Bean
     public AnalyticsRepository analyticsRepository() {
         return new ElasticAnalyticsRepository();
+    }
+
+    @Bean
+    public MonitoringRepository monitoringRepository() {
+        return new ElasticMonitoringRepository();
     }
 }
