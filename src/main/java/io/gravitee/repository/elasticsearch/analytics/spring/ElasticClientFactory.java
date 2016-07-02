@@ -64,9 +64,9 @@ public class ElasticClientFactory extends AbstractFactoryBean<Client> {
         Settings settings = Settings.settingsBuilder().put("cluster.name", configuration.getClusterName()).build();
         TransportClient transportClient = TransportClient.builder().settings(settings).build();
 
-        List<HostAddress> adresses = configuration.getHostsAddresses();
+        List<HostAddress> addresses = configuration.getHostsAddresses();
 
-        for (HostAddress address : adresses) {
+        for (HostAddress address : addresses) {
             try {
                 transportClient.addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName(address.getHostname()), address.getPort()));
             } catch (final UnknownHostException uhe) {
