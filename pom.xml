@@ -33,7 +33,7 @@
 
 	<properties>
 		<es.version>2.3.2</es.version>
-		<gravitee-repository.version>0.13.0</gravitee-repository.version>
+		<gravitee-repository.version>0.14.0-SNAPSHOT</gravitee-repository.version>
 	</properties>
 
 	<dependencies>
