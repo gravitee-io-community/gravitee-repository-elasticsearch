@@ -15,6 +15,7 @@
  */
 package io.gravitee.repository.elasticsearch.analytics;
 
+import io.gravitee.common.data.domain.Order;
 import io.gravitee.repository.analytics.AnalyticsException;
 import io.gravitee.repository.analytics.api.AnalyticsRepository;
 import io.gravitee.repository.analytics.query.HitsByApiKeyQuery;
@@ -34,16 +35,14 @@ import org.elasticsearch.client.Client;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.RangeQueryBuilder;
-import org.elasticsearch.search.aggregations.AbstractAggregationBuilder;
-import org.elasticsearch.search.aggregations.Aggregation;
-import org.elasticsearch.search.aggregations.AggregationBuilder;
-import org.elasticsearch.search.aggregations.InternalAggregation;
+import org.elasticsearch.search.aggregations.*;
 import org.elasticsearch.search.aggregations.bucket.histogram.Histogram;
 import org.elasticsearch.search.aggregations.bucket.terms.Terms;
 import org.elasticsearch.search.aggregations.bucket.terms.TermsBuilder;
 import org.elasticsearch.search.aggregations.metrics.avg.InternalAvg;
 import org.elasticsearch.search.aggregations.metrics.max.InternalMax;
 import org.elasticsearch.search.aggregations.metrics.min.InternalMin;
+import org.elasticsearch.search.aggregations.metrics.valuecount.InternalValueCount;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -142,7 +141,7 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
     }
 
     @Override
-    public TopHitsResponse query(String query, String key, String field, long from, long to, int size) throws AnalyticsException {
+    public TopHitsResponse query(String query, String key, String field, Order order, long from, long to, int size) throws AnalyticsException {
         try {
             if (size <= 0) {
                 size = 10;
@@ -158,6 +157,11 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
 
             // set the aggregation
             TermsBuilder topHitsAggregation = terms(key).field(field).size(size);
+
+            // set the order
+            setTopHitsAggregationOrder(topHitsAggregation, order);
+
+            // set aggregation
             requestBuilder.addAggregation(topHitsAggregation);
 
             // Get the response from ES
@@ -334,13 +338,13 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
             } else {
                 Map<String, List<Data>> bucketData = histogramBucket.data();
 
-                    List<Data> data = bucketData.get("hits");
-                    if (data == null) {
-                        data = new ArrayList<>();
-                        bucketData.put("hits", data);
-                    }
+                List<Data> data = bucketData.get("hits");
+                if (data == null) {
+                    data = new ArrayList<>();
+                    bucketData.put("hits", data);
+                }
 
-                    data.add(new Data(keyAsDate, dateBucket.getDocCount()));
+                data.add(new Data(keyAsDate, dateBucket.getDocCount()));
             }
         }
         histogramResponse.values().add(histogramBucket);
@@ -398,15 +402,50 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
         TopHitsResponse topHitsResponse = new TopHitsResponse();
         topHitsResponse.setName(key);
 
-        Aggregation aggregation = response.getAggregations().get(key);
-        if (aggregation != null) {
-            Map<String, Long> values = new LinkedHashMap<>();
-            Terms topHits = ((Terms) aggregation);
-            topHits.getBuckets().forEach(b -> values.put(b.getKeyAsString(), b.getDocCount()));
-            topHitsResponse.setValues(values);
+        if (response.getAggregations() != null && !response.getAggregations().asList().isEmpty()) {
+            Aggregation aggregation = response.getAggregations().get(key);
+            if (aggregation != null) {
+                Map<String, Long> values = new LinkedHashMap<>();
+                Terms topHits = ((Terms) aggregation);
+                topHits.getBuckets().forEach(b -> {
+                    values.put(b.getKeyAsString(), b.getDocCount());
+                    // find order value
+                    if (b.getAggregations() != null && !b.getAggregations().asList().isEmpty() && b.getAggregations().asList().size() >= 2) {
+                        Aggregation countAggregation = b.getAggregations().asList().get(0);
+                        // get document count
+                        long count = 0;
+                        if (countAggregation instanceof InternalValueCount)  {
+                            count = ((InternalValueCount) countAggregation).getValue();
+                        }
+                        if (count > 0) {
+                            Aggregation valueAggregation = b.getAggregations().asList().get(1);
+                            if (valueAggregation instanceof InternalAvg) {
+                                values.put(b.getKeyAsString(), (long) ((InternalAvg) valueAggregation).getValue());
+                            }
+                        } else {
+                            // no data
+                            values.remove(b.getKeyAsString());
+                        }
+                    }
+                });
+                topHitsResponse.setValues(values);
+            }
         }
 
         return topHitsResponse;
+    }
+
+    private void setTopHitsAggregationOrder(TermsBuilder topHitsAggregation, Order order) {
+        if (order != null) {
+            boolean orderDirection = (order.getDirection() == null) ? true : (Order.Direction.DESC.equals(order.getDirection()) ? false : true);
+            switch (order.getMode()) {
+                case AVG:
+                    topHitsAggregation.order(Terms.Order.aggregation("avg_" + order.getMode().toString() + order.getProperty(), orderDirection))
+                            .subAggregation(AggregationBuilders.count("count_" + order.getMode().toString() + order.getProperty()).field(order.getProperty()))
+                            .subAggregation(AggregationBuilders.avg("avg_" + order.getMode().toString() + order.getProperty()).field(order.getProperty()));
+                    break;
+            }
+        }
     }
 
     private AbstractAggregationBuilder buildAggregation(String aggType, String field) {
