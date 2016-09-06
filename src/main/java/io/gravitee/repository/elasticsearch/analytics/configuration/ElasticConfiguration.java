@@ -45,13 +45,13 @@ public class ElasticConfiguration {
 	/**
 	 * Cluster name. Used only for node protocol
 	 */
-	@Value("${analytics.elasticsearch.cluster.name:elasticsearch}")
+	@Value("${analytics.elasticsearch.cluster:elasticsearch}")
 	private String clusterName;
 	
 	/**
 	 * Prefix index name. 
 	 */
-	@Value("${analytics.elasticsearch.index.name:gravitee}")
+	@Value("${analytics.elasticsearch.index:gravitee}")
 	private String indexName;
 
 	/**
