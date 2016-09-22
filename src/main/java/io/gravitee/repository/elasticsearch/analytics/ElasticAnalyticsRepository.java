@@ -27,6 +27,7 @@ import io.gravitee.repository.analytics.query.response.TopHitsResponse;
 import io.gravitee.repository.analytics.query.response.histogram.Bucket;
 import io.gravitee.repository.analytics.query.response.histogram.Data;
 import io.gravitee.repository.analytics.query.response.histogram.HistogramResponse;
+import io.gravitee.repository.elasticsearch.analytics.utils.DateUtils;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.action.search.SearchRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
@@ -89,7 +90,7 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
     @Override
     public HealthResponse query(String api, long interval, long from, long to) throws AnalyticsException {
         try {
-            SearchRequestBuilder requestBuilder = createRequestBuilder("health");
+            SearchRequestBuilder requestBuilder = createRequestBuilder("health", from, to);
 
             QueryBuilder queryBuilder = boolQuery().must(termQuery("api", api));
 
@@ -122,7 +123,7 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
     @Override
     public HitsResponse query(String query, String key, long from, long to) throws AnalyticsException {
         try {
-            SearchRequestBuilder requestBuilder = createRequestBuilder("request");
+            SearchRequestBuilder requestBuilder = createRequestBuilder("request", from, to);
 
             QueryBuilder queryBuilder = queryStringQuery(query);
             RangeQueryBuilder rangeQueryBuilder = QueryBuilders.rangeQuery(FIELD_TIMESTAMP).from(from).to(to);
@@ -147,7 +148,7 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
                 size = 10;
             }
 
-            SearchRequestBuilder requestBuilder = createRequestBuilder("request");
+            SearchRequestBuilder requestBuilder = createRequestBuilder("request", from, to);
 
             QueryBuilder queryBuilder = queryStringQuery(query);
             RangeQueryBuilder rangeQueryBuilder = QueryBuilders.rangeQuery(FIELD_TIMESTAMP).from(from).to(to);
@@ -177,7 +178,7 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
     @Override
     public HistogramResponse query(String query, String key, String field, List<String> aggTypes, long from, long to, long interval) throws AnalyticsException {
         try {
-            SearchRequestBuilder requestBuilder = createRequestBuilder("request");
+            SearchRequestBuilder requestBuilder = createRequestBuilder("request", from, to);
 
             QueryBuilder queryBuilder = queryStringQuery(query);
             RangeQueryBuilder rangeQueryBuilder = QueryBuilders.rangeQuery(FIELD_TIMESTAMP).from(from).to(to);
@@ -216,7 +217,7 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
     }
 
     private HistogramResponse hitsByApiKey(HitsByApiKeyQuery query) {
-        SearchRequestBuilder requestBuilder = createRequestBuilder("request");
+        SearchRequestBuilder requestBuilder = createRequestBuilder("request", query.range().start(), query.range().end());
 
         QueryBuilder queryBuilder = boolQuery().must(termQuery(FIELD_API_KEY, query.apiKey()));
 
@@ -256,10 +257,23 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
         return toHistogramResponse(response, query.apiKey());
     }
 
-    private SearchRequestBuilder createRequestBuilder(String type) {
-        //TODO: Select indices according to the range from query
+    private final Map<String, Boolean> checkedIndices = new HashMap<>();
+
+    private SearchRequestBuilder createRequestBuilder(String type, long from, long to) {
+        String [] rangedIndices = DateUtils.rangedIndices(from, to)
+                .stream().map(date -> "gravitee-" + date).toArray(String[]::new);
+
+        List<String> indices = new ArrayList<>();
+
+        for (String indice : rangedIndices) {
+            boolean exists = checkedIndices.computeIfAbsent(indice,
+                    indice1 -> client.admin().indices().prepareExists(indice1).execute().actionGet().isExists());
+            if (exists) {
+                indices.add(indice);
+            }
+        }
         return client
-                .prepareSearch("gravitee-*")
+                .prepareSearch(indices.toArray(new String[indices.size()]))
                 .setTypes(type)
                 .setSearchType(SearchType.COUNT);
     }
