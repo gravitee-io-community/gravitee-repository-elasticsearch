@@ -32,7 +32,7 @@
 	<name>Gravitee IO - API Management - Repository Elasticsearch</name>
 
 	<properties>
-		<es.version>2.3.2</es.version>
+		<es.version>2.4.1</es.version>
 		<gravitee-repository.version>1.0.0-SNAPSHOT</gravitee-repository.version>
 	</properties>
 
@@ -44,6 +44,7 @@
 			<version>${gravitee-repository.version}</version>
 			<scope>provided</scope>
 		</dependency>
+
 		<dependency>
 			<groupId>org.elasticsearch</groupId>
 			<artifactId>elasticsearch</artifactId>
@@ -88,6 +89,31 @@
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>com.fasterxml.jackson.core</groupId>
+				<artifactId>jackson-core</artifactId>
+				<version>${jackson.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.fasterxml.jackson.dataformat</groupId>
+				<artifactId>jackson-dataformat-smile</artifactId>
+				<version>${jackson.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.fasterxml.jackson.dataformat</groupId>
+				<artifactId>jackson-dataformat-yaml</artifactId>
+				<version>${jackson.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.fasterxml.jackson.dataformat</groupId>
+				<artifactId>jackson-dataformat-cbor</artifactId>
+				<version>${jackson.version}</version>
+			</dependency>
+        </dependencies>
+	</dependencyManagement>
 
 	<build>
 		<resources>
