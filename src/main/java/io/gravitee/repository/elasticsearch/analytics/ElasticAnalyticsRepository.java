@@ -31,7 +31,7 @@ import io.gravitee.repository.elasticsearch.analytics.utils.DateUtils;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.action.search.SearchRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
-import org.elasticsearch.action.search.SearchType;
+import org.elasticsearch.action.support.IndicesOptions;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
@@ -257,25 +257,15 @@ public class ElasticAnalyticsRepository implements AnalyticsRepository {
         return toHistogramResponse(response, query.apiKey());
     }
 
-    private final Map<String, Boolean> checkedIndices = new HashMap<>();
-
     private SearchRequestBuilder createRequestBuilder(String type, long from, long to) {
         String [] rangedIndices = DateUtils.rangedIndices(from, to)
                 .stream().map(date -> "gravitee-" + date).toArray(String[]::new);
 
-        List<String> indices = new ArrayList<>();
-
-        for (String indice : rangedIndices) {
-            boolean exists = checkedIndices.computeIfAbsent(indice,
-                    indice1 -> client.admin().indices().prepareExists(indice1).execute().actionGet().isExists());
-            if (exists) {
-                indices.add(indice);
-            }
-        }
         return client
-                .prepareSearch(indices.toArray(new String[indices.size()]))
+                .prepareSearch(rangedIndices)
+                .setIndicesOptions(IndicesOptions.lenientExpandOpen())
                 .setTypes(type)
-                .setSearchType(SearchType.COUNT);
+                .setSize(0);
     }
 
     private HistogramResponse toHistogramResponse(SearchResponse searchResponse, String key) {
