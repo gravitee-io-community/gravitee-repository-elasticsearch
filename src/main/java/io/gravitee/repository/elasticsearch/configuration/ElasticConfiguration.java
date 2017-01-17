@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.gravitee.repository.elasticsearch.analytics.configuration;
+package io.gravitee.repository.elasticsearch.configuration;
 
-import io.gravitee.repository.elasticsearch.analytics.model.HostAddress;
-import io.gravitee.repository.elasticsearch.analytics.model.Protocol;
+import io.gravitee.repository.elasticsearch.model.HostAddress;
+import io.gravitee.repository.elasticsearch.model.Protocol;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
@@ -58,8 +58,6 @@ public class ElasticConfiguration {
 	 * Elasticsearch hosts
 	 */
 	private List<HostAddress> hostsAddresses;
-	
-	private List<String> hostsUrls;
 
 	public Protocol getProtocol() {
 		return protocol;
@@ -74,6 +72,18 @@ public class ElasticConfiguration {
 			hostsAddresses = initializeHostsAddresses();
 		}
 		return hostsAddresses;
+	}
+
+	public void setClusterName(String clusterName) {
+		this.clusterName = clusterName;
+	}
+
+	public String getIndexName() {
+		return indexName;
+	}
+
+	public void setIndexName(String indexName) {
+		this.indexName = indexName;
 	}
 
 	private List<HostAddress> initializeHostsAddresses(){

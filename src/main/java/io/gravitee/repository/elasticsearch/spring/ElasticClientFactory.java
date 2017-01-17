@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.gravitee.repository.elasticsearch.analytics.spring;
+package io.gravitee.repository.elasticsearch.spring;
 
-import io.gravitee.repository.elasticsearch.analytics.configuration.ElasticConfiguration;
-import io.gravitee.repository.elasticsearch.analytics.model.HostAddress;
+import io.gravitee.repository.elasticsearch.configuration.ElasticConfiguration;
+import io.gravitee.repository.elasticsearch.model.HostAddress;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.common.settings.Settings;

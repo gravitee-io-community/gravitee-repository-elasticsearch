@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.gravitee.repository.elasticsearch.analytics.utils;
+package io.gravitee.repository.elasticsearch.utils;
 
 import java.time.LocalDate;
 import java.time.ZoneId;

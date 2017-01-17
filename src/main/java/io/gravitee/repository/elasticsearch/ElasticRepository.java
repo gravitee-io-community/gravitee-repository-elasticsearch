@@ -17,10 +17,11 @@ package io.gravitee.repository.elasticsearch;
 
 import io.gravitee.repository.Repository;
 import io.gravitee.repository.Scope;
-import io.gravitee.repository.elasticsearch.analytics.spring.AnalyticsRepositoryConfiguration;
+import io.gravitee.repository.elasticsearch.spring.AnalyticsRepositoryConfiguration;
 
 /**
- * @author David BRASSELY (brasseld at gmail.com)
+ * @author David BRASSELY (david.brassely at graviteesource.com)
+ * @author GraviteeSource Team
  */
 public class ElasticRepository implements Repository {
 

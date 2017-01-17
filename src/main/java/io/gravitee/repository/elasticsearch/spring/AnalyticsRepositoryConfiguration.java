@@ -13,18 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.gravitee.repository.elasticsearch.analytics.spring;
+package io.gravitee.repository.elasticsearch.spring;
 
 import io.gravitee.repository.analytics.api.AnalyticsRepository;
 import io.gravitee.repository.elasticsearch.analytics.ElasticAnalyticsRepository;
-import io.gravitee.repository.elasticsearch.analytics.configuration.ElasticConfiguration;
+import io.gravitee.repository.elasticsearch.configuration.ElasticConfiguration;
+import io.gravitee.repository.elasticsearch.healthcheck.ElasticHealthCheckRepository;
 import io.gravitee.repository.elasticsearch.monitoring.ElasticMonitoringRepository;
+import io.gravitee.repository.healthcheck.HealthCheckRepository;
 import io.gravitee.repository.monitoring.MonitoringRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * @author David BRASSELY (brasseld at gmail.com)
+ * @author David BRASSELY (david.brassely at graviteesource.com)
+ * @author GraviteeSource Team
  */
 @Configuration
 public class AnalyticsRepositoryConfiguration {
@@ -37,6 +40,11 @@ public class AnalyticsRepositoryConfiguration {
     @Bean
     public ElasticConfiguration elasticConfiguration() {
         return new ElasticConfiguration();
+    }
+
+    @Bean
+    public HealthCheckRepository healthCheckRepository() {
+        return new ElasticHealthCheckRepository();
     }
 
     @Bean

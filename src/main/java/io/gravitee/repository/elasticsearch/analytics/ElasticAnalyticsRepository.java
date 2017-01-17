@@ -15,43 +15,43 @@
  */
 package io.gravitee.repository.elasticsearch.analytics;
 
-import io.gravitee.common.data.domain.Order;
 import io.gravitee.repository.analytics.AnalyticsException;
 import io.gravitee.repository.analytics.api.AnalyticsRepository;
-import io.gravitee.repository.analytics.query.HitsByApiKeyQuery;
-import io.gravitee.repository.analytics.query.Query;
-import io.gravitee.repository.analytics.query.response.HealthResponse;
-import io.gravitee.repository.analytics.query.response.HitsResponse;
+import io.gravitee.repository.analytics.query.*;
+import io.gravitee.repository.analytics.query.count.CountQuery;
+import io.gravitee.repository.analytics.query.count.CountResponse;
+import io.gravitee.repository.analytics.query.groupby.GroupByQuery;
+import io.gravitee.repository.analytics.query.groupby.GroupByResponse;
 import io.gravitee.repository.analytics.query.response.Response;
-import io.gravitee.repository.analytics.query.response.TopHitsResponse;
 import io.gravitee.repository.analytics.query.response.histogram.Bucket;
 import io.gravitee.repository.analytics.query.response.histogram.Data;
-import io.gravitee.repository.analytics.query.response.histogram.HistogramResponse;
-import io.gravitee.repository.elasticsearch.analytics.utils.DateUtils;
+import io.gravitee.repository.analytics.query.response.histogram.DateHistogramResponse;
+import io.gravitee.repository.elasticsearch.AbstractElasticRepository;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.action.search.SearchRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
-import org.elasticsearch.action.support.IndicesOptions;
-import org.elasticsearch.client.Client;
-import org.elasticsearch.index.query.QueryBuilder;
+import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
-import org.elasticsearch.index.query.RangeQueryBuilder;
 import org.elasticsearch.search.aggregations.*;
+import org.elasticsearch.search.aggregations.Aggregation;
 import org.elasticsearch.search.aggregations.bucket.histogram.Histogram;
+import org.elasticsearch.search.aggregations.bucket.range.Range;
+import org.elasticsearch.search.aggregations.bucket.range.RangeBuilder;
+import org.elasticsearch.search.aggregations.bucket.terms.InternalTerms;
 import org.elasticsearch.search.aggregations.bucket.terms.Terms;
 import org.elasticsearch.search.aggregations.bucket.terms.TermsBuilder;
-import org.elasticsearch.search.aggregations.metrics.avg.InternalAvg;
-import org.elasticsearch.search.aggregations.metrics.max.InternalMax;
-import org.elasticsearch.search.aggregations.metrics.min.InternalMin;
-import org.elasticsearch.search.aggregations.metrics.valuecount.InternalValueCount;
+import org.elasticsearch.search.aggregations.metrics.InternalNumericMetricsAggregation;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.*;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
-import static org.elasticsearch.index.query.QueryBuilders.*;
+import static org.elasticsearch.index.query.QueryBuilders.boolQuery;
+import static org.elasticsearch.index.query.QueryBuilders.queryStringQuery;
+import static org.elasticsearch.index.query.QueryBuilders.termQuery;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.*;
 
 /**
@@ -59,415 +59,291 @@ import static org.elasticsearch.search.aggregations.AggregationBuilders.*;
  * @author Titouan COMPIEGNE (titouan.compiegne at graviteesource.com)
  * @author GraviteeSource Team
  */
-public class ElasticAnalyticsRepository implements AnalyticsRepository {
+public class ElasticAnalyticsRepository extends AbstractElasticRepository implements AnalyticsRepository {
 
     /**
      * Logger.
      */
     private final Logger logger = LoggerFactory.getLogger(ElasticAnalyticsRepository.class);
 
-    private final static String FIELD_API_NAME = "api";
-    private final static String FIELD_API_KEY = "api-key";
-    private final static String FIELD_RESPONSE_STATUS = "status";
-    private final static String FIELD_RESPONSE_TIME = "response-time";
-
-    private final static String FIELD_TIMESTAMP = "@timestamp";
-
-    private final static String FIELD_HEALTH_RESPONSE_SUCCESS = "success";
-
-    @Autowired
-    private Client client;
+    private final static String TYPE_REQUEST = "request";
 
     @Override
     public <T extends Response> T query(Query<T> query) throws AnalyticsException {
-        if (query instanceof HitsByApiKeyQuery) {
-            return (T) hitsByApiKey((HitsByApiKeyQuery) query);
+        if (query instanceof DateHistogramQuery) {
+            SearchRequestBuilder requestBuilder = prepare((DateHistogramQuery) query);
+            return (T) execute(requestBuilder, toDateHistogramResponse());
+        } else if (query instanceof GroupByQuery) {
+            SearchRequestBuilder requestBuilder = prepare((GroupByQuery) query);
+            return (T) execute(requestBuilder, toGroupByResponse());
+        } else if (query instanceof CountQuery) {
+            SearchRequestBuilder requestBuilder = prepare((CountQuery) query);
+            return (T) execute(requestBuilder, toCountResponse());
         }
 
         return null;
     }
 
-    @Override
-    public HealthResponse query(String api, long interval, long from, long to) throws AnalyticsException {
+    private Response execute(SearchRequestBuilder request, Function<SearchResponse, ? extends Response> function)  throws AnalyticsException {
         try {
-            SearchRequestBuilder requestBuilder = createRequestBuilder("health", from, to);
-
-            QueryBuilder queryBuilder = boolQuery().must(termQuery("api", api));
-
-            final RangeQueryBuilder rangeQueryBuilder = QueryBuilders.rangeQuery(FIELD_TIMESTAMP).from(from).to(to);
-
-            // Finally set the query
-            requestBuilder.setQuery(boolQuery().filter(queryBuilder).filter(rangeQueryBuilder));
-
-            // Calculate aggregation
-            AggregationBuilder byDateAggregation = dateHistogram("by_date")
-                    .extendedBounds(from, to)
-                    .field(FIELD_TIMESTAMP)
-                    .interval(interval);
-
-            byDateAggregation.subAggregation(terms("by_result").field(FIELD_HEALTH_RESPONSE_SUCCESS).size(0));
-
-            // And set aggregation to the request
-            requestBuilder.addAggregation(byDateAggregation);
-
             // Get the response from ES
-            SearchResponse response = requestBuilder.get();
+            SearchResponse response = request.get();
 
-            return toHealthResponse(response);
+            // Convert response
+            return function.apply(response);
         } catch (ElasticsearchException ese) {
             logger.error("An error occurs while looking for analytics with Elasticsearch", ese);
             throw new AnalyticsException("An error occurs while looking for analytics with Elasticsearch", ese);
         }
     }
 
-    @Override
-    public HitsResponse query(String query, String key, long from, long to) throws AnalyticsException {
-        try {
-            SearchRequestBuilder requestBuilder = createRequestBuilder("request", from, to);
-
-            QueryBuilder queryBuilder = queryStringQuery(query);
-            RangeQueryBuilder rangeQueryBuilder = QueryBuilders.rangeQuery(FIELD_TIMESTAMP).from(from).to(to);
-
-            // set the query
-            requestBuilder.setQuery(boolQuery().filter(queryBuilder).filter(rangeQueryBuilder));
-
-            // Get the response from ES
-            SearchResponse response = requestBuilder.get();
-
-            return toHitsResponse(response, key);
-        } catch (ElasticsearchException ese) {
-            logger.error("An error occurs while looking for analytics with Elasticsearch", ese);
-            throw new AnalyticsException("An error occurs while looking for analytics with Elasticsearch", ese);
-        }
+    private SearchRequestBuilder prepare(CountQuery countQuery) throws AnalyticsException {
+        return init(countQuery);
     }
 
-    @Override
-    public TopHitsResponse query(String query, String key, String field, Order order, long from, long to, int size) throws AnalyticsException {
-        try {
-            if (size <= 0) {
-                size = 10;
-            }
-
-            SearchRequestBuilder requestBuilder = createRequestBuilder("request", from, to);
-
-            QueryBuilder queryBuilder = queryStringQuery(query);
-            RangeQueryBuilder rangeQueryBuilder = QueryBuilders.rangeQuery(FIELD_TIMESTAMP).from(from).to(to);
-
-            // set the query
-            requestBuilder.setQuery(boolQuery().filter(queryBuilder).filter(rangeQueryBuilder));
-
-            // set the aggregation
-            TermsBuilder topHitsAggregation = terms(key).field(field).size(size);
-
-            // set the order
-            setTopHitsAggregationOrder(topHitsAggregation, order);
-
-            // set aggregation
-            requestBuilder.addAggregation(topHitsAggregation);
-
-            // Get the response from ES
-            SearchResponse response = requestBuilder.get();
-
-            return toTopHitsResponse(response, key);
-        } catch (ElasticsearchException ese) {
-            logger.error("An error occurs while looking for analytics with Elasticsearch", ese);
-            throw new AnalyticsException("An error occurs while looking for analytics with Elasticsearch", ese);
-        }
-    }
-
-    @Override
-    public HistogramResponse query(String query, String key, String field, List<String> aggTypes, long from, long to, long interval) throws AnalyticsException {
-        try {
-            SearchRequestBuilder requestBuilder = createRequestBuilder("request", from, to);
-
-            QueryBuilder queryBuilder = queryStringQuery(query);
-            RangeQueryBuilder rangeQueryBuilder = QueryBuilders.rangeQuery(FIELD_TIMESTAMP).from(from).to(to);
-
-            // Finally set the query
-            requestBuilder.setQuery(boolQuery().filter(queryBuilder).filter(rangeQueryBuilder));
-
-            // Calculate aggregation
-            AggregationBuilder byDateAggregation = dateHistogram("by_date")
-                    .extendedBounds(from, to)
-                    .field(FIELD_TIMESTAMP)
-                    .interval(interval)
-                    .minDocCount(0);
-
-            // create hits by aggregation
-            if (aggTypes != null && !aggTypes.isEmpty()) {
-                aggTypes.forEach(aggType -> {
-                    AbstractAggregationBuilder hitsByAggregation = buildAggregation(aggType, field);
-                    if (hitsByAggregation != null) {
-                        byDateAggregation.subAggregation(hitsByAggregation);
-                    }
-                });
-            }
-
-            // set aggregation
-            requestBuilder.addAggregation(byDateAggregation);
-
-            // Get the response from ES
-            SearchResponse response = requestBuilder.get();
-
-            return toHistogramResponse(response, key);
-        } catch (ElasticsearchException ese) {
-            logger.error("An error occurs while looking for analytics with Elasticsearch", ese);
-            throw new AnalyticsException("An error occurs while looking for analytics with Elasticsearch", ese);
-        }
-    }
-
-    private HistogramResponse hitsByApiKey(HitsByApiKeyQuery query) {
-        SearchRequestBuilder requestBuilder = createRequestBuilder("request", query.range().start(), query.range().end());
-
-        QueryBuilder queryBuilder = boolQuery().must(termQuery(FIELD_API_KEY, query.apiKey()));
-
-        final RangeQueryBuilder rangeQueryBuilder = QueryBuilders.rangeQuery(FIELD_TIMESTAMP).from(query.range().start()).to(query.range().end());
-
-        // Finally set the query
-        requestBuilder.setQuery(boolQuery().filter(queryBuilder).filter(rangeQueryBuilder));
+    private SearchRequestBuilder prepare(DateHistogramQuery histogramQuery) throws AnalyticsException {
+        SearchRequestBuilder requestBuilder = init(histogramQuery);
 
         // Calculate aggregation
-        AggregationBuilder aggregationBuilder = terms("by_apikey").field(FIELD_API_NAME).size(0);
-        AggregationBuilder subAggregationBuilder = aggregationBuilder.subAggregation(
-                dateHistogram("by_date")
-                        .extendedBounds(query.range().start(), query.range().end())
-                        .field(FIELD_TIMESTAMP)
-                        .interval(query.interval().toMillis())
-                        .minDocCount(0));
+        AggregationBuilder byDateAggregation = dateHistogram("by_date")
+                .extendedBounds(histogramQuery.timeRange().range().from(), histogramQuery.timeRange().range().to())
+                .field(FIELD_TIMESTAMP)
+                .interval(histogramQuery.timeRange().interval().toMillis())
+                .minDocCount(0);
 
-        switch (query.type()) {
-            case HITS_BY_STATUS:
-                subAggregationBuilder.subAggregation(terms("by_status").field(FIELD_RESPONSE_STATUS).size(0));
-                break;
-            case HITS_BY_LATENCY:
-                subAggregationBuilder.subAggregation(terms("by_latency").field(FIELD_RESPONSE_TIME).size(0));
-                break;
-        }
-
-        // And set aggregation to the request
-        requestBuilder.addAggregation(aggregationBuilder);
-
-        logger.debug("ES Request: {}", requestBuilder.toString());
-
-        // Get the response from ES
-        SearchResponse response = requestBuilder.get();
-
-        logger.debug("ES Response: {}", requestBuilder.toString());
-
-        return toHistogramResponse(response, query.apiKey());
-    }
-
-    private SearchRequestBuilder createRequestBuilder(String type, long from, long to) {
-        String [] rangedIndices = DateUtils.rangedIndices(from, to)
-                .stream().map(date -> "gravitee-" + date).toArray(String[]::new);
-
-        return client
-                .prepareSearch(rangedIndices)
-                .setIndicesOptions(IndicesOptions.lenientExpandOpen())
-                .setTypes(type)
-                .setSize(0);
-    }
-
-    private HistogramResponse toHistogramResponse(SearchResponse searchResponse, String key) {
-        HistogramResponse histogramResponse = new HistogramResponse();
-
-        if (searchResponse.getAggregations() == null) {
-            return histogramResponse;
-        }
-
-        // Prepare data
-        Bucket histogramBucket = new Bucket(key);
-
-        Histogram dateHistogram = (Histogram) searchResponse.getAggregations().iterator().next();
-        for (Histogram.Bucket dateBucket : dateHistogram.getBuckets()) {
-            final long keyAsDate = ((DateTime) dateBucket.getKey()).getMillis();
-            histogramResponse.timestamps().add(keyAsDate);
-
-            Iterator<Aggregation> subAggregationsIte = dateBucket.getAggregations().iterator();
-            if (subAggregationsIte.hasNext()) {
-
-                while (subAggregationsIte.hasNext()) {
-                    Map<String, List<Data>> bucketData = histogramBucket.data();
-                    List<Data> data;
-                    Aggregation subAggregation = subAggregationsIte.next();
-                    if (subAggregation instanceof InternalAggregation)
-                        switch (((InternalAggregation) subAggregation).type().name()) {
-                            case "terms":
-                                for (Terms.Bucket subTermsBucket : ((Terms) subAggregation).getBuckets()) {
-                                    data = bucketData.get(subTermsBucket.getKeyAsString());
-                                    if (data == null) {
-                                        data = new ArrayList<>();
-                                        bucketData.put(subTermsBucket.getKeyAsString(), data);
-                                    }
-                                    data.add(new Data(keyAsDate, subTermsBucket.getDocCount()));
-                                }
-                                break;
-                            case "min":
-                                InternalMin internalMin = ((InternalMin) subAggregation);
-                                if (Double.isFinite(internalMin.getValue())) {
-                                    data = bucketData.get(internalMin.getName());
-                                    if (data == null) {
-                                        data = new ArrayList<>();
-                                        bucketData.put(internalMin.getName(), data);
-                                    }
-                                    data.add(new Data(keyAsDate, (long) internalMin.getValue()));
-                                }
-                                break;
-                            case "max":
-                                InternalMax internalMax = ((InternalMax) subAggregation);
-                                if (Double.isFinite(internalMax.getValue())) {
-                                    data = bucketData.get(internalMax.getName());
-                                    if (data == null) {
-                                        data = new ArrayList<>();
-                                        bucketData.put(internalMax.getName(), data);
-                                    }
-                                    data.add(new Data(keyAsDate, (long) internalMax.getValue()));
-                                }
-                                break;
-                            case "avg":
-                                InternalAvg internalAvg = ((InternalAvg) subAggregation);
-                                if (Double.isFinite(internalAvg.getValue())) {
-                                    data = bucketData.get(internalAvg.getName());
-                                    if (data == null) {
-                                        data = new ArrayList<>();
-                                        bucketData.put(internalAvg.getName(), data);
-                                    }
-                                    data.add(new Data(keyAsDate, (long) internalAvg.getValue()));
-                                }
-                                break;
-                            default:
-                                // nothing to do
-                        }
+        // Create hits by aggregation
+        if (! histogramQuery.aggregations().isEmpty()) {
+            histogramQuery.aggregations().forEach(aggregation -> {
+                AbstractAggregationBuilder hitsByAggregation = buildAggregation(aggregation);
+                if (hitsByAggregation != null) {
+                    byDateAggregation.subAggregation(hitsByAggregation);
                 }
-            } else {
-                Map<String, List<Data>> bucketData = histogramBucket.data();
-
-                List<Data> data = bucketData.get("hits");
-                if (data == null) {
-                    data = new ArrayList<>();
-                    bucketData.put("hits", data);
-                }
-
-                data.add(new Data(keyAsDate, dateBucket.getDocCount()));
-            }
+            });
         }
-        histogramResponse.values().add(histogramBucket);
 
-        return histogramResponse;
+        // Set aggregation
+        requestBuilder.addAggregation(byDateAggregation);
+
+        return requestBuilder;
     }
 
-    private HealthResponse toHealthResponse(SearchResponse searchResponse) {
-        HealthResponse healthResponse = new HealthResponse();
+    private SearchRequestBuilder prepare(GroupByQuery groupByQuery) throws AnalyticsException {
+        SearchRequestBuilder requestBuilder = init(groupByQuery);
 
-        if (searchResponse.getAggregations() == null) {
-            return healthResponse;
-        }
+        if (! groupByQuery.groups().isEmpty()) {
+            RangeBuilder groupByRangeAggregation = range("by_" + groupByQuery.field() + "_range")
+                    .field(groupByQuery.field());
 
-        // First aggregation is always a date histogram aggregation
-        Histogram histogram = searchResponse.getAggregations().get("by_date");
+            // Add ranges
+            groupByQuery.groups().forEach(range -> groupByRangeAggregation.addRange(range.from(), range.to()));
 
-        Map<Boolean, long[]> values = new HashMap<>(2);
-        long [] timestamps = new long[histogram.getBuckets().size()];
+            // set aggregation
+            requestBuilder.addAggregation(groupByRangeAggregation);
 
-        // Prepare data
-        int idx = 0;
-        for (Histogram.Bucket bucket : histogram.getBuckets()) {
-            timestamps[idx] = ((DateTime) bucket.getKey()).getMillis();
+        } else {
+            // Define aggregation
+            TermsBuilder topHitsAggregation =
+                    terms("by_" + groupByQuery.field())
+                            .field(groupByQuery.field())
+                            .size(20); // Size must be set from the groupByQuery
 
-            Terms terms = bucket.getAggregations().get("by_result");
-
-            for (Terms.Bucket termBucket : terms.getBuckets()) {
-                long [] valuesByStatus = values.getOrDefault(
-                        Integer.parseInt(termBucket.getKeyAsString()) == 1, new long[timestamps.length]);
-
-                valuesByStatus[idx] = termBucket.getDocCount();
-
-                values.put(Integer.parseInt(termBucket.getKeyAsString()) == 1, valuesByStatus);
+            // Set the order
+            if (groupByQuery.sort() != null) {
+                Sort sort = groupByQuery.sort();
+                topHitsAggregation.order(
+                        Terms.Order.aggregation(
+                                sort.getType().name() + '_' + sort.getField(),
+                                sort.getOrder() == Order.ASC));
+                topHitsAggregation.subAggregation(
+                        AggregationBuilders.avg(sort.getType().name() + '_' + sort.getField()).field(sort.getField()));
             }
 
-            idx++;
+            // Set aggregation
+            requestBuilder.addAggregation(topHitsAggregation);
         }
 
-        healthResponse.timestamps(timestamps);
-        healthResponse.buckets(values);
-
-        return healthResponse;
+        return requestBuilder;
     }
 
-    private HitsResponse toHitsResponse(SearchResponse response, String aggregationName) {
-        HitsResponse hitsResponse = new HitsResponse();
-        hitsResponse.setName(aggregationName);
-        hitsResponse.setHits(response.getHits().totalHits());
+    private SearchRequestBuilder init(AbstractQuery query) {
+        SearchRequestBuilder requestBuilder = createRequest(TYPE_REQUEST,
+                query.timeRange().range().from(), query.timeRange().range().to());
 
-        return hitsResponse;
+        BoolQueryBuilder boolQueryBuilder = boolQuery();
+        if (query.root() != null) {
+            boolQueryBuilder.filter(termQuery(query.root().field(), query.root().id()));
+        }
+
+        if (query.query() != null) {
+            boolQueryBuilder.filter(queryStringQuery(query.query().filter()));
+        }
+
+        // Apply date range filter
+        boolQueryBuilder.filter(QueryBuilders.rangeQuery(FIELD_TIMESTAMP)
+                .from(query.timeRange().range().from())
+                .to(query.timeRange().range().to()));
+
+        // Set the query
+        requestBuilder.setQuery(boolQueryBuilder);
+
+        return requestBuilder;
     }
 
-    private TopHitsResponse toTopHitsResponse(SearchResponse response, String key) {
-        TopHitsResponse topHitsResponse = new TopHitsResponse();
-        topHitsResponse.setName(key);
+    private Function<SearchResponse, DateHistogramResponse> toDateHistogramResponse() {
+        return response -> {
+            DateHistogramResponse dateHistogramResponse = new DateHistogramResponse();
 
-        if (response.getAggregations() != null && !response.getAggregations().asList().isEmpty()) {
-            Aggregation aggregation = response.getAggregations().get(key);
-            if (aggregation != null) {
-                Map<String, Long> values = new LinkedHashMap<>();
-                Terms topHits = ((Terms) aggregation);
-                topHits.getBuckets().forEach(b -> {
-                    values.put(b.getKeyAsString(), b.getDocCount());
-                    // find order value
-                    if (b.getAggregations() != null && !b.getAggregations().asList().isEmpty() && b.getAggregations().asList().size() >= 2) {
-                        Aggregation countAggregation = b.getAggregations().asList().get(0);
-                        // get document count
-                        long count = 0;
-                        if (countAggregation instanceof InternalValueCount)  {
-                            count = ((InternalValueCount) countAggregation).getValue();
+            if (response.getAggregations() == null) {
+                return dateHistogramResponse;
+            }
+
+            // Prepare data
+            Map<String, Bucket> fieldBuckets = new HashMap<>();
+
+            Histogram dateHistogram = (Histogram) response.getAggregations().iterator().next();
+            for (Histogram.Bucket dateBucket : dateHistogram.getBuckets()) {
+                final long keyAsDate = ((DateTime) dateBucket.getKey()).getMillis();
+                dateHistogramResponse.timestamps().add(keyAsDate);
+
+                Iterator<Aggregation> subAggregationsIte = dateBucket.getAggregations().iterator();
+                if (subAggregationsIte.hasNext()) {
+                    while (subAggregationsIte.hasNext()) {
+                        Aggregation subAggregation = subAggregationsIte.next();
+                        Bucket fieldBucket = fieldBuckets.get(subAggregation.getName());
+                        if (fieldBucket == null) {
+                            fieldBucket = new Bucket(subAggregation.getName(), subAggregation.getName().split("_")[1]);
+                            fieldBuckets.put(subAggregation.getName(), fieldBucket);
                         }
-                        if (count > 0) {
-                            Aggregation valueAggregation = b.getAggregations().asList().get(1);
-                            if (valueAggregation instanceof InternalAvg) {
-                                values.put(b.getKeyAsString(), (long) ((InternalAvg) valueAggregation).getValue());
+
+                        Map<String, List<Data>> bucketData = fieldBucket.data();
+                        List<Data> data;
+
+                        if (subAggregation instanceof InternalAggregation)
+                            switch (((InternalAggregation) subAggregation).type().name()) {
+                                case "terms":
+                                    for (Terms.Bucket subTermsBucket : ((Terms) subAggregation).getBuckets()) {
+                                        data = bucketData.get(subTermsBucket.getKeyAsString());
+                                        if (data == null) {
+                                            data = new ArrayList<>();
+                                            bucketData.put(subTermsBucket.getKeyAsString(), data);
+                                        }
+                                        data.add(new Data(keyAsDate, subTermsBucket.getDocCount()));
+                                    }
+                                    break;
+                                case "min":
+                                case "max":
+                                case "avg":
+                                    InternalNumericMetricsAggregation.SingleValue singleValue = (InternalNumericMetricsAggregation.SingleValue) subAggregation;
+                                    if (Double.isFinite(singleValue.value())) {
+                                        data = bucketData.get(singleValue.getName());
+                                        if (data == null) {
+                                            data = new ArrayList<>();
+                                            bucketData.put(singleValue.getName(), data);
+                                        }
+                                        data.add(new Data(keyAsDate, (long) singleValue.value()));
+                                    }
+                                    break;
+                                default:
+                                    // nothing to do
+                            }
+                    }
+                } else {
+                    //TODO: Check that's this part is still relevant (for which case ?)
+                    Bucket fieldBucket = fieldBuckets.get("hits");
+                    if (fieldBucket == null) {
+                        fieldBucket = new Bucket("hits", "hits");
+                        fieldBuckets.put("hits", fieldBucket);
+                    }
+
+                    Map<String, List<Data>> bucketData = fieldBucket.data();
+
+                    List<Data> data = bucketData.get("hits");
+                    if (data == null) {
+                        data = new ArrayList<>();
+                        bucketData.put("hits", data);
+                    }
+
+                    data.add(new Data(keyAsDate, dateBucket.getDocCount()));
+                }
+            }
+
+            dateHistogramResponse.values().addAll(fieldBuckets.values());
+
+            return dateHistogramResponse;
+        };
+    }
+
+    private Function<SearchResponse, GroupByResponse> toGroupByResponse() {
+        return response -> {
+            GroupByResponse groupByresponse = new GroupByResponse();
+
+            if (response.getAggregations() == null) {
+                return groupByresponse;
+            }
+
+            Aggregation aggregation = response.getAggregations().iterator().next();
+            groupByresponse.setField(aggregation.getName().split("_")[1]);
+
+            if (aggregation instanceof Range) {
+                Range range = (Range) aggregation;
+                for (Range.Bucket bucket : range.getBuckets()) {
+                    GroupByResponse.Bucket value =
+                            new GroupByResponse.Bucket(bucket.getKeyAsString(), bucket.getDocCount());
+                    groupByresponse.values().add(value);
+                }
+            } else if (aggregation instanceof InternalTerms) {
+                InternalTerms terms = (InternalTerms) aggregation;
+                terms.getBuckets().forEach(new Consumer<Terms.Bucket>() {
+                    @Override
+                    public void accept(Terms.Bucket bucket) {
+                        List<Aggregation> aggregations = bucket.getAggregations().asList();
+
+                        if (! aggregations.isEmpty())  {
+                            Aggregation singleAggregation = aggregations.get(0);
+                            if (singleAggregation instanceof InternalNumericMetricsAggregation.SingleValue) {
+                                InternalNumericMetricsAggregation.SingleValue singleValue = (InternalNumericMetricsAggregation.SingleValue) singleAggregation;
+                                GroupByResponse.Bucket value =
+                                        new GroupByResponse.Bucket(bucket.getKeyAsString(), (long) singleValue.value());
+                                groupByresponse.values().add(value);
                             }
                         } else {
-                            // no data
-                            values.remove(b.getKeyAsString());
+                            GroupByResponse.Bucket value =
+                                    new GroupByResponse.Bucket(bucket.getKeyAsString(), bucket.getDocCount());
+                            groupByresponse.values().add(value);
                         }
                     }
                 });
-                topHitsResponse.setValues(values);
             }
-        }
 
-        return topHitsResponse;
+            return groupByresponse;
+        };
     }
 
-    private void setTopHitsAggregationOrder(TermsBuilder topHitsAggregation, Order order) {
-        if (order != null) {
-            boolean orderDirection = (order.getDirection() == null) ? true : (Order.Direction.DESC.equals(order.getDirection()) ? false : true);
-            switch (order.getMode()) {
-                case AVG:
-                    topHitsAggregation.order(Terms.Order.aggregation("avg_" + order.getMode().toString() + order.getProperty(), orderDirection))
-                            .subAggregation(AggregationBuilders.count("count_" + order.getMode().toString() + order.getProperty()).field(order.getProperty()))
-                            .subAggregation(AggregationBuilders.avg("avg_" + order.getMode().toString() + order.getProperty()).field(order.getProperty()));
-                    break;
-            }
-        }
+    private Function<SearchResponse, CountResponse> toCountResponse() {
+        return response -> {
+            CountResponse countResponse = new CountResponse();
+            countResponse.setCount(response.getHits().totalHits());
+
+            return countResponse;
+        };
     }
 
-    private AbstractAggregationBuilder buildAggregation(String aggType, String field) {
+    private AbstractAggregationBuilder buildAggregation(io.gravitee.repository.analytics.query.Aggregation aggregation) {
         AbstractAggregationBuilder aggregationBuilder = null;
 
-        if (aggType != null && !aggType.trim().isEmpty()) {
-            switch (aggType) {
-                case "terms" :
-                    aggregationBuilder = terms("by_" + field).field(field).size(0);
+        if (aggregation != null) {
+            switch (aggregation.type()) {
+                case FIELD:
+                    aggregationBuilder = terms("by_" + aggregation.field()).field(aggregation.field()); //.size(0);
                     break;
-                case "min" :
-                    aggregationBuilder = min("min_" + field).field(field);
+                case MIN:
+                    aggregationBuilder = min("min_" + aggregation.field()).field(aggregation.field());
                     break;
-                case "max" :
-                    aggregationBuilder = max("max_" + field).field(field);
+                case MAX:
+                    aggregationBuilder = max("max_" + aggregation.field()).field(aggregation.field());
                     break;
-                case "avg" :
-                    aggregationBuilder = avg("avg_" + field).field(field);
+                case AVG:
+                    aggregationBuilder = avg("avg_" + aggregation.field()).field(aggregation.field());
                     break;
             }
         }
