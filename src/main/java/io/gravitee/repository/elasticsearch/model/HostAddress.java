@@ -13,35 +13,36 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.gravitee.repository.elasticsearch.analytics.model;
+package io.gravitee.repository.elasticsearch.model;
 
 /**
  * @author David BRASSELY (brasseld at gmail.com)
  */
-public enum Protocol {
+public class HostAddress {
+
+	public String hostname;
 	
-	HTTP(9200), TRANSPORT(9300), NODE(null);
-	
-	private final Integer defaultPort;
-	
-	private Protocol(Integer defaultPort) {
-		this.defaultPort = defaultPort;
-	}
-	
-	public static Protocol getByName(final String value){
-		
-		for (Protocol protocol : values()) {
-			if(protocol.name().equalsIgnoreCase(value)){
-				return protocol;
-			}
-		}
-		throw new IllegalArgumentException(String.format("Unsupported protocol [%s]", value));
-		
+	public int port;
+
+	public HostAddress(String hostname, int port){
+		this.hostname = hostname;
+		this.port = port;
 	}
 
-	public Integer getDefaultPort() {
-		return defaultPort;
+	public String getHostname() {
+		return hostname;
 	}
-	
+
+	public void setHostname(String hostname) {
+		this.hostname = hostname;
+	}
+
+	public int getPort() {
+		return port;
+	}
+
+	public void setPort(int port) {
+		this.port = port;
+	}
 	
 }

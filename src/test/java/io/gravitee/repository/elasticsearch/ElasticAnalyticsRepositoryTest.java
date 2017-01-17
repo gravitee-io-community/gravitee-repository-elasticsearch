@@ -16,11 +16,15 @@
 package io.gravitee.repository.elasticsearch;
 
 import io.gravitee.repository.analytics.api.AnalyticsRepository;
-import io.gravitee.repository.analytics.query.HitsByApiQuery;
-import io.gravitee.repository.analytics.query.response.histogram.HistogramResponse;
-import io.gravitee.repository.elasticsearch.analytics.spring.AnalyticsRepositoryConfiguration;
+import io.gravitee.repository.analytics.query.AggregationType;
+import io.gravitee.repository.analytics.query.Order;
+import io.gravitee.repository.analytics.query.SortBuilder;
+import io.gravitee.repository.analytics.query.SortType;
+import io.gravitee.repository.analytics.query.count.CountResponse;
+import io.gravitee.repository.analytics.query.groupby.GroupByResponse;
+import io.gravitee.repository.analytics.query.response.histogram.DateHistogramResponse;
+import io.gravitee.repository.elasticsearch.spring.AnalyticsRepositoryConfiguration;
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,10 +33,11 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import static io.gravitee.repository.analytics.query.DateRangeBuilder.lastDays;
 import static io.gravitee.repository.analytics.query.IntervalBuilder.hours;
-import static io.gravitee.repository.analytics.query.QueryBuilders.query;
+import static io.gravitee.repository.analytics.query.QueryBuilders.*;
 
 /**
- * @author David BRASSELY (brasseld at gmail.com)
+ * @author David BRASSELY (david.brassely at graviteesource.com)
+ * @author GraviteeSource Team
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(classes = { AnalyticsRepositoryConfiguration.class })
@@ -42,18 +47,129 @@ public class ElasticAnalyticsRepositoryTest {
     private AnalyticsRepository analyticsRepository;
 
     @Test
-    @Ignore
-    public void test() throws Exception {
+    public void testDateHistogram() throws Exception {
         Assert.assertNotNull(analyticsRepository);
 
-        HistogramResponse response3 = analyticsRepository.query(query().hitsByApi().period(lastDays(30)).interval(hours(1)).type(HitsByApiQuery.Type.HITS_BY_APPLICATION).build());
+        DateHistogramResponse response = analyticsRepository.query(
+                dateHistogram()
+                        .timeRange(lastDays(30), hours(1))
+                        .build());
 
-        Assert.assertNotNull(response3);
+        Assert.assertNotNull(response);
     }
 
     @Test
-    @Ignore
-    public void health() throws Exception {
-        analyticsRepository.query("api-weather", 1000 * 60 * 5, 1448781600000l, 1448781600000l);
+    public void testDateHistogram_root() throws Exception {
+        Assert.assertNotNull(analyticsRepository);
+
+        DateHistogramResponse response = analyticsRepository.query(
+                dateHistogram()
+                        .timeRange(lastDays(30), hours(1))
+                        .root("api", "4e0db366-f772-4489-8db3-66f772b48989")
+                        .build());
+
+        Assert.assertNotNull(response);
+    }
+
+    @Test
+    public void testDateHistogram_singleAggregation() throws Exception {
+        Assert.assertNotNull(analyticsRepository);
+
+        DateHistogramResponse response = analyticsRepository.query(
+                dateHistogram()
+                        .timeRange(lastDays(30), hours(1))
+                        .aggregation(AggregationType.AVG, "response-time")
+                        .build());
+
+        Assert.assertNotNull(response);
+    }
+
+    @Test
+    public void testDateHistogram_multipleAggregation_average() throws Exception {
+        Assert.assertNotNull(analyticsRepository);
+
+        DateHistogramResponse response = analyticsRepository.query(
+                dateHistogram()
+                        .timeRange(lastDays(30), hours(1))
+                        .query("api:4e0db366-f772-4489-8db3-66f772b48989")
+                        .aggregation(AggregationType.AVG, "response-time")
+                        .aggregation(AggregationType.AVG, "api-response-time")
+                        .build());
+
+        Assert.assertNotNull(response);
+    }
+
+    @Test
+    public void testDateHistogram_multipleAggregation_averageAndField() throws Exception {
+        Assert.assertNotNull(analyticsRepository);
+
+        DateHistogramResponse response = analyticsRepository.query(
+                dateHistogram()
+                        .timeRange(lastDays(30), hours(1))
+                        .query("api:4e0db366-f772-4489-8db3-66f772b48989")
+                        .aggregation(AggregationType.AVG, "response-time")
+                        .aggregation(AggregationType.FIELD, "application")
+                        .build());
+
+        Assert.assertNotNull(response);
+    }
+
+    @Test
+    public void testGroupBy_simpleField() throws Exception {
+        Assert.assertNotNull(analyticsRepository);
+
+        GroupByResponse response = analyticsRepository.query(
+                groupBy()
+                        .timeRange(lastDays(30), hours(1))
+                        .query("api:4e0db366-f772-4489-8db3-66f772b48989")
+                        .field("application")
+                        .build());
+
+        Assert.assertNotNull(response);
+    }
+
+    @Test
+    public void testGroupBy_simpleField_withOrder() throws Exception {
+        Assert.assertNotNull(analyticsRepository);
+
+        GroupByResponse response = analyticsRepository.query(
+                groupBy()
+                        .timeRange(lastDays(30), hours(1))
+                        .query("api:4e0db366-f772-4489-8db3-66f772b48989")
+                        .field("application")
+                        .sort(SortBuilder.on("response-time", Order.DESC, SortType.AVG))
+                        .build());
+
+        Assert.assertNotNull(response);
+    }
+
+    @Test
+    public void testGroupBy_simpleField_withRanges() throws Exception {
+        Assert.assertNotNull(analyticsRepository);
+
+        GroupByResponse response = analyticsRepository.query(
+                groupBy()
+                        .timeRange(lastDays(30), hours(1))
+                        .query("api:4e0db366-f772-4489-8db3-66f772b48989")
+                        .field("status")
+                        .range(100, 199)
+                        .range(200, 299)
+                        .range(300, 399)
+                        .build());
+
+        Assert.assertNotNull(response);
+    }
+
+    @Test
+    public void testCount() throws Exception {
+        Assert.assertNotNull(analyticsRepository);
+
+        CountResponse response = analyticsRepository.query(
+                count()
+                        .timeRange(lastDays(30), hours(1))
+                        .query("api:4e0db366-f772-4489-8db3-66f772b48989")
+                        .build());
+
+        Assert.assertNotNull(response);
     }
 }

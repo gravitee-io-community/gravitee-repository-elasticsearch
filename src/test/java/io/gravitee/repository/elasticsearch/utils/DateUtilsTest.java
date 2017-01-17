@@ -15,7 +15,6 @@
  */
 package io.gravitee.repository.elasticsearch.utils;
 
-import io.gravitee.repository.elasticsearch.analytics.utils.DateUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
