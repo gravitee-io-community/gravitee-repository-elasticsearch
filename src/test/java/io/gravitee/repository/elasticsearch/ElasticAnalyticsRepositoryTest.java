@@ -40,7 +40,9 @@ import static io.gravitee.repository.analytics.query.QueryBuilders.*;
  * @author GraviteeSource Team
  */
 @RunWith(SpringJUnit4ClassRunner.class)
-@ContextConfiguration(classes = { AnalyticsRepositoryConfiguration.class })
+@ContextConfiguration(
+        classes = AnalyticsRepositoryConfiguration.class,
+        initializers = PropertySourceRepositoryInitializer.class)
 public class ElasticAnalyticsRepositoryTest {
 
     @Autowired
