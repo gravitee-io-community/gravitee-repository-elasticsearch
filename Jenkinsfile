@@ -1,6 +1,6 @@
 node() {
-    def redisHost = "-DELASTIC_HOST=${env.ELASTIC_TEST_HOST}"
-    def redisPort = "-DELASTIC_PORT=${env.ELASTIC_TEST_PORT}"
+    def elasticHost = "-DELASTIC_HOST=${env.ELASTIC_TEST_HOST}"
+    def elasticPort = "-DELASTIC_PORT=${env.ELASTIC_TEST_PORT}"
     def mvnArgs = ["-U", "-Pgravitee-report", elasticHost, elasticPort, "clean", "deploy"]
 
     stage "Checkout"
