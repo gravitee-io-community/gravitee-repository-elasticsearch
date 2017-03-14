@@ -72,7 +72,7 @@ public class ElasticAnalyticsRepository extends AbstractElasticRepository implem
     public <T extends Response> T query(Query<T> query) throws AnalyticsException {
         if (query instanceof DateHistogramQuery) {
             SearchRequestBuilder requestBuilder = prepare((DateHistogramQuery) query);
-            return (T) execute(requestBuilder, toDateHistogramResponse());
+            return (T) execute(requestBuilder, toDateHistogramResponse((DateHistogramQuery) query));
         } else if (query instanceof GroupByQuery) {
             SearchRequestBuilder requestBuilder = prepare((GroupByQuery) query);
             return (T) execute(requestBuilder, toGroupByResponse());
@@ -88,7 +88,6 @@ public class ElasticAnalyticsRepository extends AbstractElasticRepository implem
         try {
             // Get the response from ES
             SearchResponse response = request.get();
-
             // Convert response
             return function.apply(response);
         } catch (ElasticsearchException ese) {
@@ -189,7 +188,7 @@ public class ElasticAnalyticsRepository extends AbstractElasticRepository implem
         return requestBuilder;
     }
 
-    private Function<SearchResponse, DateHistogramResponse> toDateHistogramResponse() {
+    private Function<SearchResponse, DateHistogramResponse> toDateHistogramResponse(DateHistogramQuery query) {
         return response -> {
             DateHistogramResponse dateHistogramResponse = new DateHistogramResponse();
 
@@ -247,27 +246,19 @@ public class ElasticAnalyticsRepository extends AbstractElasticRepository implem
                                     // nothing to do
                             }
                     }
-                } else {
-                    //TODO: Check that's this part is still relevant (for which case ?)
-                    Bucket fieldBucket = fieldBuckets.get("hits");
-                    if (fieldBucket == null) {
-                        fieldBucket = new Bucket("hits", "hits");
-                        fieldBuckets.put("hits", fieldBucket);
-                    }
-
-                    Map<String, List<Data>> bucketData = fieldBucket.data();
-
-                    List<Data> data = bucketData.get("hits");
-                    if (data == null) {
-                        data = new ArrayList<>();
-                        bucketData.put("hits", data);
-                    }
-
-                    data.add(new Data(keyAsDate, dateBucket.getDocCount()));
                 }
             }
 
-            dateHistogramResponse.values().addAll(fieldBuckets.values());
+            if (! query.aggregations().isEmpty()) {
+                query.aggregations().forEach(aggregation -> {
+                    String key = aggregation.type().name().toLowerCase() + '_' + aggregation.field();
+                    if (aggregation.type() == AggregationType.FIELD) {
+                        key = "by_" + aggregation.field();
+                    }
+
+                    dateHistogramResponse.values().add(fieldBuckets.get(key));
+                });
+            }
 
             return dateHistogramResponse;
         };
