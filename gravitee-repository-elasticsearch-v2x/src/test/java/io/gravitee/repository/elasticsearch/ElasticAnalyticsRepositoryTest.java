@@ -23,13 +23,15 @@ import io.gravitee.repository.analytics.query.SortType;
 import io.gravitee.repository.analytics.query.count.CountResponse;
 import io.gravitee.repository.analytics.query.groupby.GroupByResponse;
 import io.gravitee.repository.analytics.query.response.histogram.DateHistogramResponse;
-import io.gravitee.repository.elasticsearch.spring.AnalyticsRepositoryConfiguration;
+import io.gravitee.repository.elasticsearch.spring.AnalyticsRepositoryTestConfiguration;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.TestExecutionListeners;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.support.DependencyInjectionTestExecutionListener;
 
 import static io.gravitee.repository.analytics.query.DateRangeBuilder.lastDays;
 import static io.gravitee.repository.analytics.query.IntervalBuilder.hours;
@@ -40,8 +42,11 @@ import static io.gravitee.repository.analytics.query.QueryBuilders.*;
  * @author GraviteeSource Team
  */
 @RunWith(SpringJUnit4ClassRunner.class)
+@TestExecutionListeners(
+        listeners = { ElasticsearchNodeListener.class,
+                DependencyInjectionTestExecutionListener.class })
 @ContextConfiguration(
-        classes = AnalyticsRepositoryConfiguration.class,
+        classes = AnalyticsRepositoryTestConfiguration.class,
         initializers = PropertySourceRepositoryInitializer.class)
 public class ElasticAnalyticsRepositoryTest {
 
