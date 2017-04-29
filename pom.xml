@@ -30,12 +30,16 @@
 	<artifactId>gravitee-repository-elasticsearch</artifactId>
 	<version>1.3.0-SNAPSHOT</version>
 	<name>Gravitee.io APIM - Repository - Elasticsearch</name>
+	<packaging>pom</packaging>
 
 	<properties>
-		<es.version>2.4.1</es.version>
 		<gravitee-repository.version>1.4.0</gravitee-repository.version>
 	</properties>
 
+	<modules>
+		<module>gravitee-repository-elasticsearch-v2x</module>
+		<module>gravitee-repository-elasticsearch-v5x</module>
+	</modules>
 	<dependencies>
 		<!-- Gravitee dependencies -->
 		<dependency>
@@ -43,12 +47,6 @@
 			<artifactId>gravitee-repository</artifactId>
 			<version>${gravitee-repository.version}</version>
 			<scope>provided</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>org.elasticsearch</groupId>
-			<artifactId>elasticsearch</artifactId>
-			<version>${es.version}</version>
 		</dependency>
 
 		<!-- Spring dependencies -->
@@ -72,6 +70,20 @@
 			<artifactId>slf4j-api</artifactId>
 			<version>${slf4j.version}</version>
 			<scope>provided</scope>
+		</dependency>
+
+		<!-- Logback -->
+		<dependency>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-classic</artifactId>
+			<version>${logback.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-core</artifactId>
+			<version>${logback.version}</version>
+			<scope>test</scope>
 		</dependency>
 
 		<!-- Unit Tests -->
@@ -116,32 +128,20 @@
 	</dependencyManagement>
 
 	<build>
-		<resources>
-			<resource>
-				<directory>src/main/resources</directory>
-				<filtering>true</filtering>
-			</resource>
-		</resources>
-		<plugins>
-			<plugin>
-				<artifactId>maven-assembly-plugin</artifactId>
-				<version>2.4</version>
-				<configuration>
-					<appendAssemblyId>false</appendAssemblyId>
-					<descriptors>
-						<descriptor>src/main/assembly/plugin-assembly.xml</descriptor>
-					</descriptors>
-				</configuration>
-				<executions>
-					<execution>
-						<id>make-plugin-assembly</id>
-						<phase>package</phase>
-						<goals>
-							<goal>single</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
-		</plugins>
+		<pluginManagement>
+			<plugins>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-surefire-plugin</artifactId>
+					<version>2.16</version>
+					<configuration>
+						<workingDirectory>${project.build.directory}</workingDirectory>
+						<systemPropertyVariables>
+							<java.io.tmpdir>${project.build.directory}</java.io.tmpdir>
+						</systemPropertyVariables>
+					</configuration>
+				</plugin>
+			</plugins>
+		</pluginManagement>
 	</build>
 </project>
