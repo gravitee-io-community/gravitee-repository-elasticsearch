@@ -15,12 +15,27 @@
  */
 package io.gravitee.repository.elasticsearch;
 
+import io.gravitee.repository.analytics.AnalyticsException;
+import io.gravitee.repository.analytics.query.AbstractQuery;
+import io.gravitee.repository.analytics.query.TimeRangeFilter;
+import io.gravitee.repository.analytics.query.response.Response;
+import io.gravitee.repository.elasticsearch.analytics.ElasticAnalyticsRepository;
 import io.gravitee.repository.elasticsearch.configuration.ElasticConfiguration;
 import io.gravitee.repository.elasticsearch.utils.DateUtils;
+import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.action.search.SearchRequestBuilder;
+import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.support.IndicesOptions;
 import org.elasticsearch.client.Client;
+import org.elasticsearch.index.query.BoolQueryBuilder;
+import org.elasticsearch.index.query.QueryBuilders;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+
+import java.util.function.Function;
+
+import static org.elasticsearch.index.query.QueryBuilders.*;
 
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
@@ -28,7 +43,14 @@ import org.springframework.beans.factory.annotation.Autowired;
  */
 public abstract class AbstractElasticRepository {
 
+    /**
+     * Logger.
+     */
+    protected final Logger logger = LoggerFactory.getLogger(getClass());
+
     protected final static String FIELD_TIMESTAMP = "@timestamp";
+    protected final static String TYPE_REQUEST = "request";
+    protected final static String FIELD_REQUEST_ID = "id";
 
     @Autowired
     protected ElasticConfiguration configuration;
@@ -47,5 +69,54 @@ public abstract class AbstractElasticRepository {
                 .setIndicesOptions(IndicesOptions.lenientExpandOpen())
                 .setTypes(type)
                 .setSize(0);
+    }
+
+    protected SearchRequestBuilder createRequest(String type) {
+        return client
+                .prepareSearch(configuration.getIndexName() + "-*")
+                .setIndicesOptions(IndicesOptions.lenientExpandOpen())
+                .setTypes(type)
+                .setSize(0);
+    }
+
+    protected SearchRequestBuilder init(AbstractQuery query) {
+        TimeRangeFilter timeRange = query.timeRange();
+        SearchRequestBuilder requestBuilder =
+                (timeRange != null) ?
+                        createRequest(TYPE_REQUEST, timeRange.range().from(), timeRange.range().to()):
+                        createRequest(TYPE_REQUEST);
+
+        BoolQueryBuilder boolQueryBuilder = boolQuery();
+        if (query.root() != null) {
+            boolQueryBuilder.filter(termQuery(query.root().field(), query.root().id()));
+        }
+
+        if (query.query() != null) {
+            boolQueryBuilder.filter(queryStringQuery(query.query().filter()));
+        }
+
+        // Apply date range filter
+        if (timeRange != null) {
+            boolQueryBuilder.filter(QueryBuilders.rangeQuery(FIELD_TIMESTAMP)
+                    .from(timeRange.range().from())
+                    .to(timeRange.range().to()));
+        }
+
+        // Set the query
+        requestBuilder.setQuery(boolQueryBuilder);
+
+        return requestBuilder;
+    }
+
+    protected Response execute(SearchRequestBuilder request, Function<SearchResponse, ? extends Response> function)  throws AnalyticsException {
+        try {
+            // Get the response from ES
+            SearchResponse response = request.get();
+            // Convert response
+            return function.apply(response);
+        } catch (ElasticsearchException ese) {
+            logger.error("An error occurs while looking for analytics with Elasticsearch", ese);
+            throw new AnalyticsException("An error occurs while looking for analytics with Elasticsearch", ese);
+        }
     }
 }

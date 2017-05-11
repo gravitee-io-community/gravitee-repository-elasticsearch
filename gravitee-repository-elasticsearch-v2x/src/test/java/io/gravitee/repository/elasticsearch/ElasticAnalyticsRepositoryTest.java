@@ -55,8 +55,6 @@ public class ElasticAnalyticsRepositoryTest {
 
     @Test
     public void testDateHistogram() throws Exception {
-        Assert.assertNotNull(analyticsRepository);
-
         DateHistogramResponse response = analyticsRepository.query(
                 dateHistogram()
                         .timeRange(lastDays(30), hours(1))
@@ -67,8 +65,6 @@ public class ElasticAnalyticsRepositoryTest {
 
     @Test
     public void testDateHistogram_root() throws Exception {
-        Assert.assertNotNull(analyticsRepository);
-
         DateHistogramResponse response = analyticsRepository.query(
                 dateHistogram()
                         .timeRange(lastDays(30), hours(1))
@@ -80,8 +76,6 @@ public class ElasticAnalyticsRepositoryTest {
 
     @Test
     public void testDateHistogram_singleAggregation() throws Exception {
-        Assert.assertNotNull(analyticsRepository);
-
         DateHistogramResponse response = analyticsRepository.query(
                 dateHistogram()
                         .timeRange(lastDays(30), hours(1))
@@ -93,8 +87,6 @@ public class ElasticAnalyticsRepositoryTest {
 
     @Test
     public void testDateHistogram_multipleAggregation_average() throws Exception {
-        Assert.assertNotNull(analyticsRepository);
-
         DateHistogramResponse response = analyticsRepository.query(
                 dateHistogram()
                         .timeRange(lastDays(30), hours(1))
@@ -108,8 +100,6 @@ public class ElasticAnalyticsRepositoryTest {
 
     @Test
     public void testDateHistogram_multipleAggregation_averageAndField() throws Exception {
-        Assert.assertNotNull(analyticsRepository);
-
         DateHistogramResponse response = analyticsRepository.query(
                 dateHistogram()
                         .timeRange(lastDays(30), hours(1))
@@ -123,8 +113,6 @@ public class ElasticAnalyticsRepositoryTest {
 
     @Test
     public void testGroupBy_simpleField() throws Exception {
-        Assert.assertNotNull(analyticsRepository);
-
         GroupByResponse response = analyticsRepository.query(
                 groupBy()
                         .timeRange(lastDays(30), hours(1))
@@ -137,8 +125,6 @@ public class ElasticAnalyticsRepositoryTest {
 
     @Test
     public void testGroupBy_simpleField_withOrder() throws Exception {
-        Assert.assertNotNull(analyticsRepository);
-
         GroupByResponse response = analyticsRepository.query(
                 groupBy()
                         .timeRange(lastDays(30), hours(1))
@@ -152,8 +138,6 @@ public class ElasticAnalyticsRepositoryTest {
 
     @Test
     public void testGroupBy_simpleField_withRanges() throws Exception {
-        Assert.assertNotNull(analyticsRepository);
-
         GroupByResponse response = analyticsRepository.query(
                 groupBy()
                         .timeRange(lastDays(30), hours(1))
@@ -169,8 +153,6 @@ public class ElasticAnalyticsRepositoryTest {
 
     @Test
     public void testCount() throws Exception {
-        Assert.assertNotNull(analyticsRepository);
-
         CountResponse response = analyticsRepository.query(
                 count()
                         .timeRange(lastDays(30), hours(1))

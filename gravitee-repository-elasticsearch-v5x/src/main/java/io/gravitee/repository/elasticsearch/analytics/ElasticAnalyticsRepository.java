@@ -27,11 +27,8 @@ import io.gravitee.repository.analytics.query.response.histogram.Bucket;
 import io.gravitee.repository.analytics.query.response.histogram.Data;
 import io.gravitee.repository.analytics.query.response.histogram.DateHistogramResponse;
 import io.gravitee.repository.elasticsearch.AbstractElasticRepository;
-import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.action.search.SearchRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
-import org.elasticsearch.index.query.BoolQueryBuilder;
-import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.aggregations.AbstractAggregationBuilder;
 import org.elasticsearch.search.aggregations.Aggregation;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
@@ -46,14 +43,11 @@ import org.elasticsearch.search.aggregations.bucket.terms.Terms;
 import org.elasticsearch.search.aggregations.bucket.terms.TermsAggregationBuilder;
 import org.elasticsearch.search.aggregations.metrics.InternalNumericMetricsAggregation;
 import org.joda.time.DateTime;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-import static org.elasticsearch.index.query.QueryBuilders.*;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.*;
 
 /**
@@ -62,13 +56,6 @@ import static org.elasticsearch.search.aggregations.AggregationBuilders.*;
  * @author GraviteeSource Team
  */
 public class ElasticAnalyticsRepository extends AbstractElasticRepository implements AnalyticsRepository {
-
-    /**
-     * Logger.
-     */
-    private final Logger logger = LoggerFactory.getLogger(ElasticAnalyticsRepository.class);
-
-    private final static String TYPE_REQUEST = "request";
 
     @Override
     public <T extends Response> T query(Query<T> query) throws AnalyticsException {
@@ -84,18 +71,6 @@ public class ElasticAnalyticsRepository extends AbstractElasticRepository implem
         }
 
         return null;
-    }
-
-    private Response execute(SearchRequestBuilder request, Function<SearchResponse, ? extends Response> function)  throws AnalyticsException {
-        try {
-            // Get the response from ES
-            SearchResponse response = request.get();
-            // Convert response
-            return function.apply(response);
-        } catch (ElasticsearchException ese) {
-            logger.error("An error occurs while looking for analytics with Elasticsearch", ese);
-            throw new AnalyticsException("An error occurs while looking for analytics with Elasticsearch", ese);
-        }
     }
 
     private SearchRequestBuilder prepare(CountQuery countQuery) throws AnalyticsException {
@@ -162,30 +137,6 @@ public class ElasticAnalyticsRepository extends AbstractElasticRepository implem
             // Set aggregation
             requestBuilder.addAggregation(topHitsAggregation);
         }
-
-        return requestBuilder;
-    }
-
-    private SearchRequestBuilder init(AbstractQuery query) {
-        SearchRequestBuilder requestBuilder = createRequest(TYPE_REQUEST,
-                query.timeRange().range().from(), query.timeRange().range().to());
-
-        BoolQueryBuilder boolQueryBuilder = boolQuery();
-        if (query.root() != null) {
-            boolQueryBuilder.filter(termQuery(query.root().field(), query.root().id()));
-        }
-
-        if (query.query() != null) {
-            boolQueryBuilder.filter(queryStringQuery(query.query().filter()));
-        }
-
-        // Apply date range filter
-        boolQueryBuilder.filter(QueryBuilders.rangeQuery(FIELD_TIMESTAMP)
-                .from(query.timeRange().range().from())
-                .to(query.timeRange().range().to()));
-
-        // Set the query
-        requestBuilder.setQuery(boolQueryBuilder);
 
         return requestBuilder;
     }
