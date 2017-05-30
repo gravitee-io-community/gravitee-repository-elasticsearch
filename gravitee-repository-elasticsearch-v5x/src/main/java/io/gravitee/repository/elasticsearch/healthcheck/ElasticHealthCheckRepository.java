@@ -74,7 +74,7 @@ public class ElasticHealthCheckRepository extends AbstractElasticRepository impl
                     .field(FIELD_TIMESTAMP)
                     .interval(interval);
 
-            byDateAggregation.subAggregation(terms("by_result").field(FIELD_HEALTH_RESPONSE_SUCCESS).size(0));
+            byDateAggregation.subAggregation(terms("by_result").field(FIELD_HEALTH_RESPONSE_SUCCESS));
 
             // And set aggregation to the request
             requestBuilder.addAggregation(byDateAggregation);
@@ -111,11 +111,11 @@ public class ElasticHealthCheckRepository extends AbstractElasticRepository impl
 
             for (Terms.Bucket termBucket : terms.getBuckets()) {
                 long [] valuesByStatus = values.getOrDefault(
-                        Integer.parseInt(termBucket.getKeyAsString()) == 1, new long[timestamps.length]);
+                        Boolean.parseBoolean(termBucket.getKeyAsString()), new long[timestamps.length]);
 
                 valuesByStatus[idx] = termBucket.getDocCount();
 
-                values.put(Integer.parseInt(termBucket.getKeyAsString()) == 1, valuesByStatus);
+                values.put(Boolean.parseBoolean(termBucket.getKeyAsString()), valuesByStatus);
             }
 
             idx++;
