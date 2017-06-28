@@ -61,6 +61,8 @@ final class LogRequestBuilder {
     private final static String FIELD_USER = "user";
     private final static String FIELD_API_KEY = "api-key";
 
+    private final static String FIELD_MESSAGE = "message";
+
     static Request build(Map<String, Object> source, boolean full) {
         Request request = new Request();
 
@@ -106,6 +108,8 @@ final class LogRequestBuilder {
             request.setClientResponseHeaders((HashMap) source.get(FIELD_CLIENT_RESPONSE_HEADERS));
             request.setProxyRequestHeaders((HashMap) source.get(FIELD_PROXY_REQUEST_HEADERS));
             request.setProxyResponseHeaders((HashMap) source.get(FIELD_PROXY_RESPONSE_HEADERS));
+
+            request.setMessage((String) source.get(FIELD_MESSAGE));
         }
 
         return request;
