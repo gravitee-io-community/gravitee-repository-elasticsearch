@@ -23,7 +23,7 @@
 	<parent>
 		<groupId>io.gravitee</groupId>
 		<artifactId>gravitee-parent</artifactId>
-		<version>7</version>
+		<version>8</version>
 	</parent>
 
 	<groupId>io.gravitee.repository</groupId>
@@ -39,6 +39,7 @@
 	<modules>
 		<module>gravitee-repository-elasticsearch-v2x</module>
 		<module>gravitee-repository-elasticsearch-v5x</module>
+		<module>gravitee-repository-elasticsearch-http</module>
 	</modules>
 
 	<dependencies>
