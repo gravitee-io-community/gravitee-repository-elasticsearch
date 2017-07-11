@@ -35,6 +35,7 @@ final class LogRequestBuilder {
     private final static String FIELD_REQUEST_ID = "id";
     private final static String FIELD_TRANSACTION_ID = "transaction";
     private final static String FIELD_TIMESTAMP = "@timestamp";
+    private final static String FIELD_GATEWAY = "gateway";
 
     private final static String FIELD_METHOD = "method";
     private final static String FIELD_URI = "uri";
@@ -102,6 +103,7 @@ final class LogRequestBuilder {
         request.setPlan((String) source.get(FIELD_PLAN));
         request.setUser((String) source.get(FIELD_USER));
         request.setApiKey((String) source.get(FIELD_API_KEY));
+        request.setGateway((String) source.get(FIELD_GATEWAY));
 
         if (full) {
             request.setClientRequestHeaders((HashMap) source.get(FIELD_CLIENT_REQUEST_HEADERS));
