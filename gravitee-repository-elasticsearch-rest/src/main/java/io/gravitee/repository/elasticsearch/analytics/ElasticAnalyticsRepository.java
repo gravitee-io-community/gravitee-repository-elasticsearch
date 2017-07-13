@@ -54,7 +54,7 @@ public class ElasticAnalyticsRepository extends AbstractElasticRepository implem
      */
     private final Logger logger = LoggerFactory.getLogger(ElasticAnalyticsRepository.class);
 
-    private final static String DATE_HISTOGRAM_TEMPLATE = "healthCheckRequest.ftl";
+    private final static String DATE_HISTOGRAM_TEMPLATE = "dateHistogram.ftl";
     private final static String GROUP_BY_TEMPLATE = "groupBy.ftl";
     private final static String COUNT_TEMPLATE = "count.ftl";
 
