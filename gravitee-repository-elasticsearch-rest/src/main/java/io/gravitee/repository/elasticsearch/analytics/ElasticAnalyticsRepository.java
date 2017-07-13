@@ -18,7 +18,9 @@ package io.gravitee.repository.elasticsearch.analytics;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.gravitee.repository.analytics.AnalyticsException;
 import io.gravitee.repository.analytics.api.AnalyticsRepository;
-import io.gravitee.repository.analytics.query.*;
+import io.gravitee.repository.analytics.query.AggregationType;
+import io.gravitee.repository.analytics.query.DateHistogramQuery;
+import io.gravitee.repository.analytics.query.Query;
 import io.gravitee.repository.analytics.query.count.CountQuery;
 import io.gravitee.repository.analytics.query.count.CountResponse;
 import io.gravitee.repository.analytics.query.groupby.GroupByQuery;
@@ -31,32 +33,12 @@ import io.gravitee.repository.elasticsearch.AbstractElasticRepository;
 import io.gravitee.repository.elasticsearch.ElasticsearchComponent;
 import io.gravitee.repository.elasticsearch.model.elasticsearch.ESSearchResponse;
 import io.gravitee.repository.exceptions.TechnicalException;
-import org.elasticsearch.ElasticsearchException;
-import org.elasticsearch.action.search.SearchRequestBuilder;
-import org.elasticsearch.action.search.SearchResponse;
-import org.elasticsearch.index.query.BoolQueryBuilder;
-import org.elasticsearch.index.query.QueryBuilders;
-import org.elasticsearch.search.aggregations.*;
-import org.elasticsearch.search.aggregations.Aggregation;
-import org.elasticsearch.search.aggregations.bucket.histogram.Histogram;
-import org.elasticsearch.search.aggregations.bucket.range.Range;
-import org.elasticsearch.search.aggregations.bucket.range.RangeBuilder;
-import org.elasticsearch.search.aggregations.bucket.terms.InternalTerms;
-import org.elasticsearch.search.aggregations.bucket.terms.Terms;
-import org.elasticsearch.search.aggregations.bucket.terms.TermsBuilder;
-import org.elasticsearch.search.aggregations.metrics.InternalNumericMetricsAggregation;
-import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.util.NumberUtils;
 
 import java.util.*;
-import java.util.function.Consumer;
 import java.util.function.Function;
-
-import static org.elasticsearch.index.query.QueryBuilders.*;
-import static org.elasticsearch.search.aggregations.AggregationBuilders.*;
 
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
@@ -72,19 +54,20 @@ public class ElasticAnalyticsRepository extends AbstractElasticRepository implem
      */
     private final Logger logger = LoggerFactory.getLogger(ElasticAnalyticsRepository.class);
 
+    private final static String DATE_HISTOGRAM_TEMPLATE = "healthCheckRequest.ftl";
+    private final static String GROUP_BY_TEMPLATE = "groupBy.ftl";
+    private final static String COUNT_TEMPLATE = "count.ftl";
+
     @Autowired
     private ElasticsearchComponent elasticsearchComponent;
 
     @Override
     public <T extends Response> T query(Query<T> query) throws AnalyticsException {
-
-
         if (query instanceof DateHistogramQuery) {
+            final Map<String, Object> data = new HashMap<>();
+            data.put("histogramQuery", query);
 
-            final Map<String, Object> datas = new HashMap<>();
-            datas.put("histogramQuery", ((DateHistogramQuery) query));
-
-            final String request = this.freeMarkerComponent.generateFromTemplate("dateHistogram.ftl", datas);
+            final String request = this.freeMarkerComponent.generateFromTemplate(DATE_HISTOGRAM_TEMPLATE, data);
 
             final Long from = ((DateHistogramQuery) query).timeRange().range().from();
             final Long to = ((DateHistogramQuery) query).timeRange().range().to();
@@ -99,14 +82,11 @@ public class ElasticAnalyticsRepository extends AbstractElasticRepository implem
             } catch (TechnicalException e) {
                 logger.error("", e);
             }
-
-
         } else if (query instanceof GroupByQuery) {
+            final Map<String, Object> data = new HashMap<>();
+            data.put("groupByQuery", query);
 
-            final Map<String, Object> datas = new HashMap<>();
-            datas.put("groupByQuery", ((GroupByQuery) query));
-
-            final String request = this.freeMarkerComponent.generateFromTemplate("groupBy.ftl", datas);
+            final String request = this.freeMarkerComponent.generateFromTemplate(GROUP_BY_TEMPLATE, data);
 
             final Long from = ((GroupByQuery) query).timeRange().range().from();
             final Long to = ((GroupByQuery) query).timeRange().range().to();
@@ -122,11 +102,10 @@ public class ElasticAnalyticsRepository extends AbstractElasticRepository implem
                 logger.error("", e);
             }
         } else if (query instanceof CountQuery) {
+            final Map<String, Object> data = new HashMap<>();
+            data.put("countQuery", query);
 
-            final Map<String, Object> datas = new HashMap<>();
-            datas.put("countQuery", ((CountQuery) query));
-
-            final String request = this.freeMarkerComponent.generateFromTemplate("count.ftl", datas);
+            final String request = this.freeMarkerComponent.generateFromTemplate(COUNT_TEMPLATE, data);
 
             final Long from = ((CountQuery) query).timeRange().range().from();
             final Long to = ((CountQuery) query).timeRange().range().to();
@@ -147,12 +126,12 @@ public class ElasticAnalyticsRepository extends AbstractElasticRepository implem
     }
 
     private Response execute(ESSearchResponse response, Function<ESSearchResponse, ? extends Response> function) throws AnalyticsException {
-        try {
+    //    try {
             return function.apply(response);
-        } catch (ElasticsearchException ese) {
-            logger.error("An error occurs while looking for analytics with Elasticsearch", ese);
-            throw new AnalyticsException("An error occurs while looking for analytics with Elasticsearch", ese);
-        }
+    //    } catch (ElasticsearchException ese) {
+    //        logger.error("An error occurs while looking for analytics with Elasticsearch", ese);
+    //        throw new AnalyticsException("An error occurs while looking for analytics with Elasticsearch", ese);
+    //    }
     }
 
     private Function<ESSearchResponse, DateHistogramResponse> toDateHistogramResponse(DateHistogramQuery query) {
@@ -241,7 +220,6 @@ public class ElasticAnalyticsRepository extends AbstractElasticRepository implem
                 }
                 break;
         }
-
     }
 
     private Function<ESSearchResponse, GroupByResponse> toGroupByResponse() {

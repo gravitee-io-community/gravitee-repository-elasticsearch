@@ -132,9 +132,8 @@
     		<groupId>org.elasticsearch</groupId>
     		<artifactId>elasticsearch</artifactId>
     		<version>${elasticsearch.version}</version>
-    		<!-- <scope>test</scope> -->
+    		<scope>test</scope>
 		</dependency>
-		
 		
 	</dependencies>
 

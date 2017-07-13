@@ -44,6 +44,8 @@ public class ElasticHealthCheckRepository extends AbstractElasticRepository impl
 
     private final static String TYPE_HEALTH = "/health";
 
+    private final static String HEALTHCHECK_TEMPLATE = "healthCheckRequest.ftl";
+
     @Override
     public HealthResponse query(final String api, final long interval, final long from, final long to) throws AnalyticsException {
 
@@ -54,7 +56,7 @@ public class ElasticHealthCheckRepository extends AbstractElasticRepository impl
             datas.put("from", from);
             datas.put("to", to);
 
-            final String query = this.freeMarkerComponent.generateFromTemplate("healthCheckRequest.ftl", datas);
+            final String query = this.freeMarkerComponent.generateFromTemplate(HEALTHCHECK_TEMPLATE, datas);
 
 			final ESSearchResponse result = this.elasticsearchComponent.search(this.getIndexName(from, to) + TYPE_HEALTH, query);
             logger.debug("ES response {}", result);
@@ -73,7 +75,6 @@ public class ElasticHealthCheckRepository extends AbstractElasticRepository impl
      * @return the HealthResponse response
      */
     private HealthResponse toHealthResponse(final ESSearchResponse searchResponse) {
-
         final HealthResponse healthResponse = new HealthResponse();
 
         if (searchResponse.getAggregations() == null) {
@@ -99,6 +100,7 @@ public class ElasticHealthCheckRepository extends AbstractElasticRepository impl
             }
             idx++;
         }
+
         return healthResponse;
     }
     

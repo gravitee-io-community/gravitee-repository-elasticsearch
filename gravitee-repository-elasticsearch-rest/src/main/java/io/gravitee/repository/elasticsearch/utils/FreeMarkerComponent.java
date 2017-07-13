@@ -15,20 +15,19 @@
  */
 package io.gravitee.repository.elasticsearch.utils;
 
-import java.io.IOException;
-import java.io.StringWriter;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
-
-import javax.annotation.PostConstruct;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.annotation.PostConstruct;
+import java.io.IOException;
+import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.Locale;
+import java.util.Map;
 
 /**
  * Utility Spring been that encapsulates FreeMarker tools. 
@@ -57,7 +56,7 @@ public class FreeMarkerComponent {
     private void init() {
 
         this.configuration = new Configuration(Configuration.VERSION_2_3_23);
-        this.configuration.setDefaultEncoding("UTF-8");
+        this.configuration.setDefaultEncoding(StandardCharsets.UTF_8.name());
         this.configuration.setDateFormat("iso_utc");
         this.configuration.setLocale(Locale.ENGLISH);
         this.configuration.setNumberFormat("computer");
@@ -87,6 +86,6 @@ public class FreeMarkerComponent {
      * @return the string generated from the template
      */
     public String generateFromTemplate(final String templateName) {
-        return this.generateFromTemplate(templateName, new HashMap<>());
+        return this.generateFromTemplate(templateName, Collections.emptyMap());
     }
 }

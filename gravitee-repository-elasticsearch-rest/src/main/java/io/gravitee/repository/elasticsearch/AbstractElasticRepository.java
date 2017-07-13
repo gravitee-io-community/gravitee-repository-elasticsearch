@@ -20,6 +20,8 @@ import io.gravitee.repository.elasticsearch.utils.DateUtils;
 import io.gravitee.repository.elasticsearch.utils.FreeMarkerComponent;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.stream.Collectors;
 
 /**
@@ -30,7 +32,7 @@ import java.util.stream.Collectors;
  */
 public abstract class AbstractElasticRepository {
 
-    protected final static String FIELD_TIMESTAMP = "@timestamp";
+    private final static DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy.MM.dd");
 
     /**
      * Elasticsearch configuration.
@@ -61,5 +63,10 @@ public abstract class AbstractElasticRepository {
                 .stream()
                 .map(date -> configuration.getIndexName() + '-' + date)
                 .collect(Collectors.joining(","));
+    }
+
+    protected String getIndexName() {
+        final String suffixDay = LocalDate.now().format(DATE_TIME_FORMATTER);
+        return configuration.getIndexName() + '-' + suffixDay;
     }
 }

@@ -17,6 +17,7 @@ package io.gravitee.repository.elasticsearch.monitoring;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.gravitee.repository.elasticsearch.AbstractElasticRepository;
 import io.gravitee.repository.elasticsearch.ElasticsearchComponent;
 import io.gravitee.repository.elasticsearch.model.elasticsearch.ESSearchResponse;
 import io.gravitee.repository.elasticsearch.model.elasticsearch.SearchHits;
@@ -26,19 +27,17 @@ import io.gravitee.repository.monitoring.MonitoringRepository;
 import io.gravitee.repository.monitoring.model.MonitoringResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import java.time.LocalDate;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
-
-import static java.lang.String.format;
 
 /**
  * @author Azize Elamrani (azize dot elamrani at gmail dot com)
  * @author GraviteeSource Team
  */
-public class ElasticMonitoringRepository implements MonitoringRepository {
+public class ElasticMonitoringRepository extends AbstractElasticRepository implements MonitoringRepository {
+
+    private final static String MONITORING_TEMPLATE = "monitoringRequest.ftl";
 
     private final static String FIELD_GATEWAY_NAME = "gateway";
     private final static String FIELD_TIMESTAMP = "@timestamp";
@@ -58,15 +57,12 @@ public class ElasticMonitoringRepository implements MonitoringRepository {
 
     @Override
     public MonitoringResponse query(final String gatewayId) {
-        final String suffixDay = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy.MM.dd"));
-
         try {
-
         	final Map<String, Object> data = new HashMap<>();
         	data.put("gateway", gatewayId);
 
-        	final String query = freeMarkerComponent.generateFromTemplate("monitoringRequest.ftl", data);
-            final ESSearchResponse searchResponse = elasticsearchComponent.search("gravitee-" + suffixDay, query);
+        	final String query = freeMarkerComponent.generateFromTemplate(MONITORING_TEMPLATE, data);
+            final ESSearchResponse searchResponse = elasticsearchComponent.search(getIndexName(), query);
 
             final SearchHits hits = searchResponse.getSearchHits();
             if (hits != null && hits.getHits().size() > 0) {

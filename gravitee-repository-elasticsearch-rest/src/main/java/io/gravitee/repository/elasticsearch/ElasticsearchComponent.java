@@ -15,32 +15,29 @@
  */
 package io.gravitee.repository.elasticsearch;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.gravitee.common.http.HttpHeaders;
+import io.gravitee.common.http.HttpMethod;
+import io.gravitee.common.http.HttpStatusCode;
+import io.gravitee.common.http.MediaType;
+import io.gravitee.repository.elasticsearch.configuration.ElasticConfiguration;
+import io.gravitee.repository.elasticsearch.model.HostAddress;
+import io.gravitee.repository.elasticsearch.model.elasticsearch.ESSearchResponse;
+import io.gravitee.repository.elasticsearch.model.elasticsearch.Health;
+import io.gravitee.repository.elasticsearch.utils.FreeMarkerComponent;
+import io.gravitee.repository.exceptions.TechnicalException;
+import org.asynchttpclient.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
-
-import javax.annotation.PostConstruct;
-
-import io.gravitee.repository.elasticsearch.model.elasticsearch.ESSearchResponse;
-import org.asynchttpclient.AsyncHttpClient;
-import org.asynchttpclient.BoundRequestBuilder;
-import org.asynchttpclient.DefaultAsyncHttpClient;
-import org.asynchttpclient.ListenableFuture;
-import org.asynchttpclient.Response;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import io.gravitee.repository.elasticsearch.configuration.ElasticConfiguration;
-import io.gravitee.repository.elasticsearch.model.HostAddress;
-import io.gravitee.repository.elasticsearch.model.elasticsearch.Health;
-import io.gravitee.repository.elasticsearch.utils.FreeMarkerComponent;
-import io.gravitee.repository.exceptions.TechnicalException;
 
 /**
  * Utility Elasticsearch Spring bean used to call Elasticsearch using the REST api.
@@ -59,7 +56,7 @@ public class ElasticsearchComponent {
 	private static final String URL_SEARCH = "/_search?ignore_unavailable=true";
 	private static final String URL_TEMPLATE = "/_template";
 	
-	private static final String CONTENT_TYPE = "application/json;charset=UTF-8";
+	private static final String CONTENT_TYPE = MediaType.APPLICATION_JSON + ";charset=UTF-8";
 
 	/**
 	 * Configuration of Elasticsearch (cluster name, addresses, ...)
@@ -93,7 +90,6 @@ public class ElasticsearchComponent {
      */
     @PostConstruct
 	private void init() {
-
 	    this.asyncHttpClient = new DefaultAsyncHttpClient();
 	    this.mapper = new ObjectMapper();
 	    
@@ -139,7 +135,7 @@ public class ElasticsearchComponent {
 			
 			final String body = response.getResponseBody(StandardCharsets.UTF_8);
 			
-			if (response.getStatusCode() != 200) {
+			if (response.getStatusCode() != HttpStatusCode.OK_200) {
 				logger.error("Impossible to call Elasticsearch GET {}. Body is {}", response.getUri(), body);
 				throw new TechnicalException("Impossible to call Elasticsearch. Elasticsearch response code is " + response.getStatusCode());
 			}
@@ -164,12 +160,12 @@ public class ElasticsearchComponent {
 	public ESSearchResponse search(final String indexes, final String query) throws TechnicalException {
 		try {
 			// index can be null _search on all index
-			final ListenableFuture<Response> future = this.getRestPostClient("/" + indexes + URL_SEARCH).setBody(query).execute();
+			final ListenableFuture<Response> future = this.getRestPostClient('/' + indexes + URL_SEARCH).setBody(query).execute();
 			final Response response = future.get();
 
 			final String body = response.getResponseBody(StandardCharsets.UTF_8);
 
-			if (response.getStatusCode() != 200) {
+			if (response.getStatusCode() != HttpStatusCode.OK_200) {
 				logger.error("Impossible to call Elasticsearch POST {}. Body is {}", response.getUri(), body);
 				throw new TechnicalException("Impossible to call Elasticsearch POST " + response.getUri() + ". Response is " + response.getStatusCode() );
 			}
@@ -188,9 +184,7 @@ public class ElasticsearchComponent {
 	 * @throws TechnicalException when a problem occur during the http call
 	 */
 	public void putTemplate() throws TechnicalException {
-		
 		try {
-			
 			final Map<String, Object> data = new HashMap<>();
 			data.put("indexName", this.configuration.getIndexName());
 			final String body = this.freeMarkerComponent.generateFromTemplate("templateGravitee.ftl", data);
@@ -205,7 +199,7 @@ public class ElasticsearchComponent {
 
 			final String responseText = response.getResponseBody(StandardCharsets.UTF_8);
 
-			if (response.getStatusCode() != 200) {
+			if (response.getStatusCode() != HttpStatusCode.OK_200) {
 				logger.error("Impossible to call Elasticsearch PUT {}. Body is {}", response.getUri(), responseText);
 				throw new TechnicalException("Impossible to call Elasticsearch PUT " + response.getUri() + ". Response is " + response.getStatusCode() );
 			}
@@ -223,13 +217,14 @@ public class ElasticsearchComponent {
 	 * @return POST HTTP client with common http headers filed
 	 */
 	public BoundRequestBuilder getRestPostClient(final String path) {
-		
 		final String url = this.getHost() + path;
 		
 		logger.debug("Try to call POST {}", url);
-		
-		final BoundRequestBuilder clientBuilder = this.asyncHttpClient.preparePost(url)
-			.addHeader("Content-Type", CONTENT_TYPE);
+
+		final BoundRequestBuilder clientBuilder =
+				this.asyncHttpClient
+						.prepareRequest(new RequestBuilder().setMethod(HttpMethod.POST.name()).setUrl(url))
+			.addHeader(HttpHeaders.CONTENT_TYPE, CONTENT_TYPE);
 		return this.addCommonHeaders(clientBuilder);
 	}
 	
@@ -239,12 +234,13 @@ public class ElasticsearchComponent {
 	 * @return GET HTTP client with common http headers filed
 	 */
 	public BoundRequestBuilder getRestGetClient(final String path) {
-		
 		final String url = this.getHost() + path;
 		
 		logger.debug("Try to call GET {}", url);
-		
-		final BoundRequestBuilder clientBuilder = this.asyncHttpClient.prepareGet(url);
+
+		final BoundRequestBuilder clientBuilder =
+				this.asyncHttpClient
+						.prepareRequest(new RequestBuilder().setMethod(HttpMethod.GET.name()).setUrl(url));
 		return this.addCommonHeaders(clientBuilder);
 	}
 	
@@ -254,13 +250,14 @@ public class ElasticsearchComponent {
 	 * @return PUT HTTP client with common http headers filed
 	 */
 	public BoundRequestBuilder getRestPutClient(final String path) {
-		
 		final String url = this.getHost() + path;
 		
 		logger.debug("Try to call PUT {}", url);
-		
-		final BoundRequestBuilder clientBuilder = this.asyncHttpClient.preparePut(url)
-			.addHeader("Content-Type", CONTENT_TYPE);
+
+		final BoundRequestBuilder clientBuilder =
+			this.asyncHttpClient
+					.prepareRequest(new RequestBuilder().setMethod(HttpMethod.PUT.name()).setUrl(url))
+					.addHeader(HttpHeaders.CONTENT_TYPE, CONTENT_TYPE);
 		return this.addCommonHeaders(clientBuilder);
 	}
 	
@@ -270,12 +267,13 @@ public class ElasticsearchComponent {
 	 * @return DELETE HTTP client with common http headers filed
 	 */
 	public BoundRequestBuilder getRestDeleteClient(final String path) {
-		
 		final String url = this.getHost() + path;
 		
 		logger.debug("Try to call DELETE {}", url);
-		
-		final BoundRequestBuilder clientBuilder = this.asyncHttpClient.prepareDelete(url);
+
+		final BoundRequestBuilder clientBuilder =
+				this.asyncHttpClient
+						.prepareRequest(new RequestBuilder().setMethod(HttpMethod.DELETE.name()).setUrl(url));
 		return this.addCommonHeaders(clientBuilder);
 	}
 	
@@ -286,14 +284,14 @@ public class ElasticsearchComponent {
 	 */
 	private BoundRequestBuilder addCommonHeaders(final BoundRequestBuilder builder) {
 		builder.setCharset(StandardCharsets.UTF_8)
-			.addHeader("Accept", CONTENT_TYPE)
-			.addHeader("Accept-Charset", "UTF-8");
+			.addHeader(HttpHeaders.ACCEPT, CONTENT_TYPE)
+			.addHeader(HttpHeaders.ACCEPT_CHARSET, StandardCharsets.UTF_8.name());
 		
 		// basic auth
 		if (this.authorizationHeader != null) {
-			builder.addHeader("Authorization", this.authorizationHeader);
+			builder.addHeader(HttpHeaders.AUTHORIZATION, this.authorizationHeader);
 		}
-		
+
 		return builder;
 	}
 }
