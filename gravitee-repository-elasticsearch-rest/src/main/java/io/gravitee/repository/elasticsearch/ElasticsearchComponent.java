@@ -73,6 +73,7 @@ public class ElasticsearchComponent {
 	/**
 	 * HTTP client.
 	 */
+	//TODO use vertx
     private AsyncHttpClient asyncHttpClient;
     
     /**
@@ -94,7 +95,7 @@ public class ElasticsearchComponent {
 	    this.mapper = new ObjectMapper();
 	    
 	    // Use the ElasticConfiguration class to define username and password for ES
-	    // For example if Elasticsearch is protected by nginx
+	    // For example if Elasticsearch is protected by nginx or x-pack
 	    if (this.configuration.getUsername() != null) {
 	    	this.authorizationHeader = this.initEncodedAuthorization(this.configuration.getUsername(), this.configuration.getPassword());
 	    }
@@ -114,11 +115,10 @@ public class ElasticsearchComponent {
 		
 	/**
 	 * Get the Elasticsearch host
-	 * @return host:port
+	 * @return http://<host>:<port>
 	 */
 	private String getHost() {
 		//TODO handle loadbalancing
-		//TODO how to check the configuration ? the HTTP scheme must be defined in the configuration
 		final HostAddress host = this.configuration.getHostsAddresses().get(0);
 		return "http://" + host.getHostname() +":" + host.getPort();
 	 }
@@ -158,9 +158,29 @@ public class ElasticsearchComponent {
 	 * @throws TechnicalException when a problem occur during the http call
 	 */
 	public ESSearchResponse search(final String indexes, final String query) throws TechnicalException {
+		return this.search(indexes, null, query);
+	}
+	
+	/**
+	 * Peform an HTTP search query
+	 * @param indexes indexes names. If null search on all indexes
+	 * @param types elasticsearch document type separated by comma. If null search on all types
+	 * @param query json body query
+	 * @return elasticsearch response
+	 * @throws TechnicalException when a problem occur during the http call
+	 */
+	public ESSearchResponse search(final String indexes, final String types, final String query) throws TechnicalException {
 		try {
 			// index can be null _search on all index
-			final ListenableFuture<Response> future = this.getRestPostClient('/' + indexes + URL_SEARCH).setBody(query).execute();
+			final StringBuilder url = new StringBuilder("/")
+					.append(indexes);
+			if (types != null) {
+				url.append("/")
+					.append(types);
+			}
+			url.append(URL_SEARCH);
+			
+			final ListenableFuture<Response> future = this.getRestPostClient(url.toString()).setBody(query).execute();
 			final Response response = future.get();
 
 			final String body = response.getResponseBody(StandardCharsets.UTF_8);

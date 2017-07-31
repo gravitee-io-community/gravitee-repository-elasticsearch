@@ -126,7 +126,7 @@ final class LogRequestBuilder {
     }
 
     private static Map<String, List<String>> convertToMap(final JsonNode jsonNode) {
-        Map<String, List<String>> result = new HashMap();
+        Map<String, List<String>> result = new HashMap<>();
 
         final Iterator<String> iterator = jsonNode.fieldNames();
         while (iterator.hasNext()) {
@@ -138,7 +138,7 @@ final class LogRequestBuilder {
     }
 
     private static List<String> convertToList(ArrayNode values) {
-        final List<String> result = new ArrayList(values.size());
+        final List<String> result = new ArrayList<>(values.size());
         values.forEach(jsonNode -> result.add(jsonNode.asText()));
         return result;
     }

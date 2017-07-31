@@ -15,29 +15,46 @@
  */
 package io.gravitee.repository.elasticsearch.monitoring;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.gravitee.repository.elasticsearch.AbstractElasticRepository;
-import io.gravitee.repository.elasticsearch.ElasticsearchComponent;
-import io.gravitee.repository.elasticsearch.model.elasticsearch.ESSearchResponse;
-import io.gravitee.repository.elasticsearch.model.elasticsearch.SearchHits;
-import io.gravitee.repository.elasticsearch.utils.FreeMarkerComponent;
-import io.gravitee.repository.exceptions.TechnicalException;
-import io.gravitee.repository.monitoring.MonitoringRepository;
-import io.gravitee.repository.monitoring.model.MonitoringResponse;
-import org.springframework.beans.factory.annotation.Autowired;
-
 import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.gravitee.repository.elasticsearch.AbstractElasticRepository;
+import io.gravitee.repository.elasticsearch.analytics.ElasticAnalyticsRepository;
+import io.gravitee.repository.elasticsearch.model.elasticsearch.ESSearchResponse;
+import io.gravitee.repository.elasticsearch.model.elasticsearch.SearchHits;
+import io.gravitee.repository.exceptions.TechnicalException;
+import io.gravitee.repository.monitoring.MonitoringRepository;
+import io.gravitee.repository.monitoring.model.MonitoringResponse;
+
 /**
  * @author Azize Elamrani (azize dot elamrani at gmail dot com)
  * @author GraviteeSource Team
+ * @author Guillaume Waignier
+ * @author Sebastien Devaux
  */
 public class ElasticMonitoringRepository extends AbstractElasticRepository implements MonitoringRepository {
 
+	 /**
+     * Logger.
+     */
+    private final Logger logger = LoggerFactory.getLogger(ElasticAnalyticsRepository.class);
+    
+	/**
+	 * Name of the FreeMarker template used to query monitoring document types.
+	 */
     private final static String MONITORING_TEMPLATE = "monitoringRequest.ftl";
+
+    /**
+     * Document type used for monitoring.
+     */
+    private static final String ES_TYPE_NAME = "monitor";
 
     private final static String FIELD_GATEWAY_NAME = "gateway";
     private final static String FIELD_TIMESTAMP = "@timestamp";
@@ -47,12 +64,6 @@ public class ElasticMonitoringRepository extends AbstractElasticRepository imple
     private final static String FIELD_PROCESS = "process";
     private final static String FIELD_OS = "os";
 
-    @Autowired
-    private ElasticsearchComponent elasticsearchComponent;
-
-    @Autowired
-    private FreeMarkerComponent freeMarkerComponent;
-
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -61,21 +72,26 @@ public class ElasticMonitoringRepository extends AbstractElasticRepository imple
         	final Map<String, Object> data = new HashMap<>();
         	data.put("gateway", gatewayId);
 
-        	final String query = freeMarkerComponent.generateFromTemplate(MONITORING_TEMPLATE, data);
-            final ESSearchResponse searchResponse = elasticsearchComponent.search(getIndexName(), query);
+        	final String query = this.freeMarkerComponent.generateFromTemplate(MONITORING_TEMPLATE, data);
+            final ESSearchResponse searchResponse = this.elasticsearchComponent.search(this.elasticsearchIndexUtil.getTodayIndexName(), ES_TYPE_NAME, query);
 
             final SearchHits hits = searchResponse.getSearchHits();
             if (hits != null && hits.getHits().size() > 0) {
                 return this.convert(hits.getHits().get(0).getSource());
             }
-        } catch(final TechnicalException e) {
-        	//TODO handle error
+        } catch(final TechnicalException exception) {
+        	logger.error("Impossible make query for monitoring", exception);
         	return null;
         }
         //TODO return null?
         return null;
     }
 
+    /**
+     * Convert the raw Elasticsearch response
+     * @param source Raw json elasticsearch response
+     * @return monitoring result
+     */
     @SuppressWarnings("unchecked")
     private MonitoringResponse convert(final JsonNode source) {
 
@@ -164,5 +180,4 @@ public class ElasticMonitoringRepository extends AbstractElasticRepository imple
 
         return monitoringResponse;
     }
-
 }

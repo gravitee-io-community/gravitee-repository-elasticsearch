@@ -30,14 +30,26 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class Health {
 
+	/**
+	 * Name of the cluster
+	 */
 	@JsonProperty("cluster_name")
 	private String clusterName;
 	
+	/**
+	 * Cluster status (green, yellow, red)
+	 */
 	private String status;
 	
+	/**
+	 * Timeout
+	 */
 	@JsonProperty("timed_out")
 	private Boolean timedOut;
 	
+	/**
+	 * Number of node
+	 */
 	@JsonProperty("number_of_node")
 	private Integer nodeNumber;
 

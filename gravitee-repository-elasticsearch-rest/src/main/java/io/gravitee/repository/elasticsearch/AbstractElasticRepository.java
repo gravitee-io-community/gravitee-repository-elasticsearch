@@ -15,14 +15,10 @@
  */
 package io.gravitee.repository.elasticsearch;
 
-import io.gravitee.repository.elasticsearch.configuration.ElasticConfiguration;
-import io.gravitee.repository.elasticsearch.utils.DateUtils;
-import io.gravitee.repository.elasticsearch.utils.FreeMarkerComponent;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.stream.Collectors;
+import io.gravitee.repository.elasticsearch.utils.ElasticsearchIndexUtil;
+import io.gravitee.repository.elasticsearch.utils.FreeMarkerComponent;
 
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
@@ -31,14 +27,6 @@ import java.util.stream.Collectors;
  * @author GraviteeSource Team
  */
 public abstract class AbstractElasticRepository {
-
-    private final static DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy.MM.dd");
-
-    /**
-     * Elasticsearch configuration.
-     */
-    @Autowired
-    protected ElasticConfiguration configuration;
 
     /**
      * Elasticsearch component to perform HTTP request.
@@ -51,26 +39,10 @@ public abstract class AbstractElasticRepository {
      */
     @Autowired
     protected FreeMarkerComponent freeMarkerComponent;
-
+    
     /**
-     * Return the list of ES index names separated by a comma
-     * @param from start date for the search
-     * @param to end date for the search
-     * @return the list of ES index names separated by a comma
+     * Util component used to compute index name.
      */
-    protected String getIndexName(long from, long to) {
-        return DateUtils.rangedIndices(from, to)
-                .stream()
-                .map(date -> configuration.getIndexName() + '-' + date)
-                .collect(Collectors.joining(","));
-    }
-
-    protected String getIndexName() {
-        final String suffixDay = LocalDate.now().format(DATE_TIME_FORMATTER);
-        return configuration.getIndexName() + '-' + suffixDay;
-    }
-
-    protected String getAllIndexName() {
-        return configuration.getIndexName() + "-*";
-    }
+    @Autowired
+    protected ElasticsearchIndexUtil elasticsearchIndexUtil;
 }

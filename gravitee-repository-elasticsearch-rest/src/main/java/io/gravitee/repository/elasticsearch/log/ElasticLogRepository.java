@@ -70,7 +70,7 @@ public class ElasticLogRepository extends AbstractElasticRepository implements L
 
         final ESSearchResponse result;
         try {
-            result = this.elasticsearchComponent.search(this.getIndexName(from, to), request);
+            result = this.elasticsearchComponent.search(this.elasticsearchIndexUtil.getIndexName(from, to), request);
             logger.debug("ES response {}", result);
             return (TabularResponse) this.execute(result, toTabularResponse());
         } catch (TechnicalException e) {
@@ -93,7 +93,7 @@ public class ElasticLogRepository extends AbstractElasticRepository implements L
         final ESSearchResponse result;
         try {
             //TODO check index name /request
-            result = this.elasticsearchComponent.search(this.getAllIndexName(), request);
+            result = this.elasticsearchComponent.search(this.elasticsearchIndexUtil.getAllIndexName(), request);
             logger.debug("ES response {}", result);
 
             if (result.getSearchHits().getTotal() == 0) {

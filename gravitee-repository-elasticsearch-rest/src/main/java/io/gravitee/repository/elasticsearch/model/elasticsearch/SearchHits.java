@@ -26,6 +26,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * The hits of a search request.
  * 
  * @see https://github.com/elastic/elasticsearch/blob/master/core/src/main/java/org/elasticsearch/search/SearchHits.java
+ *
+ * @author Guillaume Waignier
+ * @author Sebastien Devaux
+ *
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)

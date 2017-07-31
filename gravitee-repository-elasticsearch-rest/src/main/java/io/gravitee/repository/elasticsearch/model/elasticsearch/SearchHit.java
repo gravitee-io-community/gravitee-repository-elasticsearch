@@ -27,6 +27,10 @@ import com.fasterxml.jackson.databind.JsonNode;
  *
  * @see SearchHits
  * @see https://github.com/elastic/elasticsearch/blob/master/core/src/main/java/org/elasticsearch/search/SearchHit.java
+ *
+ * @author Guillaume Waignier
+ * @author Sebastien Devaux
+ *
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)

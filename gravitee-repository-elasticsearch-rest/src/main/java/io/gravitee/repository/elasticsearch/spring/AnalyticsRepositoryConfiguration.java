@@ -15,18 +15,23 @@
  */
 package io.gravitee.repository.elasticsearch.spring;
 
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
 import io.gravitee.repository.analytics.api.AnalyticsRepository;
 import io.gravitee.repository.elasticsearch.ElasticsearchComponent;
 import io.gravitee.repository.elasticsearch.analytics.ElasticAnalyticsRepository;
+import io.gravitee.repository.elasticsearch.analytics.query.CountQueryCommand;
+import io.gravitee.repository.elasticsearch.analytics.query.DateHistogramQueryCommand;
+import io.gravitee.repository.elasticsearch.analytics.query.GroupByQueryCommand;
 import io.gravitee.repository.elasticsearch.configuration.ElasticConfiguration;
 import io.gravitee.repository.elasticsearch.healthcheck.ElasticHealthCheckRepository;
 import io.gravitee.repository.elasticsearch.log.ElasticLogRepository;
 import io.gravitee.repository.elasticsearch.monitoring.ElasticMonitoringRepository;
+import io.gravitee.repository.elasticsearch.utils.ElasticsearchIndexUtil;
 import io.gravitee.repository.elasticsearch.utils.FreeMarkerComponent;
 import io.gravitee.repository.healthcheck.HealthCheckRepository;
 import io.gravitee.repository.monitoring.MonitoringRepository;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
@@ -51,6 +56,21 @@ public class AnalyticsRepositoryConfiguration {
     public AnalyticsRepository analyticsRepository() {
         return new ElasticAnalyticsRepository();
     }
+    
+    @Bean
+    public CountQueryCommand countQueryCommand() {
+        return new CountQueryCommand();
+    }
+    
+    @Bean
+    public DateHistogramQueryCommand dateHistogramQueryCommand() {
+        return new DateHistogramQueryCommand();
+    }
+    
+    @Bean
+    public GroupByQueryCommand groupByQueryCommand() {
+        return new GroupByQueryCommand();
+    }
 
     @Bean
     public MonitoringRepository monitoringRepository() {
@@ -68,5 +88,12 @@ public class AnalyticsRepositoryConfiguration {
     }
 
     @Bean
-    public ElasticLogRepository elasticLogRepository() { return new ElasticLogRepository(); }
+    public ElasticLogRepository elasticLogRepository() {
+    	return new ElasticLogRepository(); 
+    }
+    
+    @Bean
+    public ElasticsearchIndexUtil elasticsearchIndexUtil() {
+    	return new ElasticsearchIndexUtil(); 
+    }
 }

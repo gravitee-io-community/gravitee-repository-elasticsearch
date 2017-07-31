@@ -44,5 +44,4 @@ public class HostAddress {
 	public void setPort(int port) {
 		this.port = port;
 	}
-	
 }

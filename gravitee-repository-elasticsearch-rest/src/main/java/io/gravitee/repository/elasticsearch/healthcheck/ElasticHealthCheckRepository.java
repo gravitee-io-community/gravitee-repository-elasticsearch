@@ -42,8 +42,14 @@ public class ElasticHealthCheckRepository extends AbstractElasticRepository impl
      */
     private final Logger logger = LoggerFactory.getLogger(ElasticHealthCheckRepository.class);
 
-    private final static String TYPE_HEALTH = "/health";
+    /**
+     * Elasticsearch document type corresponding to healthcheck.
+     */
+    private final static String TYPE_HEALTH = "health";
 
+    /**
+     * Template name used to generate healthCheck query.
+     */
     private final static String HEALTHCHECK_TEMPLATE = "healthCheckRequest.ftl";
 
     @Override
@@ -58,7 +64,7 @@ public class ElasticHealthCheckRepository extends AbstractElasticRepository impl
 
             final String query = this.freeMarkerComponent.generateFromTemplate(HEALTHCHECK_TEMPLATE, datas);
 
-			final ESSearchResponse result = this.elasticsearchComponent.search(this.getIndexName(from, to) + TYPE_HEALTH, query);
+			final ESSearchResponse result = this.elasticsearchComponent.search(this.elasticsearchIndexUtil.getIndexName(from, to),TYPE_HEALTH, query);
             logger.debug("ES response {}", result);
 
             return this.toHealthResponse(result);
@@ -75,19 +81,18 @@ public class ElasticHealthCheckRepository extends AbstractElasticRepository impl
      * @return the HealthResponse response
      */
     private HealthResponse toHealthResponse(final ESSearchResponse searchResponse) {
-        final HealthResponse healthResponse = new HealthResponse();
-
+        
         if (searchResponse.getAggregations() == null) {
-            return healthResponse;
+            return new HealthResponse();
         }
 
         // First aggregation is always a date histogram aggregation
         final Aggregation histogram = searchResponse.getAggregations().get("by_date");
 
         // init the response
-        this.fillEmptyHealthResponse(healthResponse, histogram.getBuckets().size());
+        final HealthResponse healthResponse = this.createEmptyHealthResponse(histogram.getBuckets().size());
 
-        // Prepare data
+        // Fill data
         int idx = 0;
         for (final JsonNode bucket : histogram.getBuckets()) {
         	healthResponse.timestamps()[idx] = bucket.get("key").asLong();
@@ -106,15 +111,17 @@ public class ElasticHealthCheckRepository extends AbstractElasticRepository impl
     
     /**
      * Fill an empty healthResponse
-     * @param healthResponse the response to fill with empty success and failure
      * @param numberHistogram number of date histogram
+     * @return healthResponse: the response to fill with empty success and failure
      */
-    private void fillEmptyHealthResponse(final HealthResponse healthResponse, final int numberHistogram) {
+    private HealthResponse createEmptyHealthResponse(final int numberHistogram) {
+    	final HealthResponse healthResponse = new HealthResponse();
     	final long [] timestamps = new long[numberHistogram];
         final Map<Boolean, long[]> values = new HashMap<>(2);
         values.put(true, new long[timestamps.length]);
         values.put(false, new long[timestamps.length]);
         healthResponse.timestamps(timestamps);
         healthResponse.buckets(values);
+        return healthResponse;
     }
 }

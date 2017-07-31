@@ -23,6 +23,12 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 
 
+/**
+ * Elasticsearch Aggregation response 
+ * @author Guillaume Waignier
+ * @author Sebastien Devaux
+ *
+ */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class Aggregation implements Serializable {

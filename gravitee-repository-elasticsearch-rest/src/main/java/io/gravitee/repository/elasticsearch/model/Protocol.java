@@ -16,11 +16,15 @@
 package io.gravitee.repository.elasticsearch.model;
 
 /**
+ * Protocol supported by this elasticsearch repository : only HTTP
+ * 
  * @author David BRASSELY (brasseld at gmail.com)
+ * @author Guillaume Waignier
+ * @author Sebastien Devaux
  */
 public enum Protocol {
 	
-	HTTP(9200), TRANSPORT(9300), NODE(null);
+	HTTP(9200);
 	
 	private final Integer defaultPort;
 	
@@ -42,6 +46,4 @@ public enum Protocol {
 	public Integer getDefaultPort() {
 		return defaultPort;
 	}
-	
-	
 }

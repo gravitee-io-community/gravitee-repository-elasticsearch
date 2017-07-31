@@ -3,25 +3,25 @@
   "query": {
     "bool": {
       "filter": [
-<#if groupByQuery.query()?has_content>
+<#if query.query()?has_content>
         {
           "query_string": {
-            "query": "${groupByQuery.query().filter()}"
+            "query": "${query.query().filter()}"
           }
         },
 </#if>
-<#if groupByQuery.root()?has_content>
+<#if query.root()?has_content>
         {
           "term": {
-            "${groupByQuery.root().field()}": "${groupByQuery.root().id()}"
+            "${query.root().field()}": "${query.root().id()}"
           }
         },
 </#if>
         {
           "range": {
             "@timestamp": {
-              "from": ${groupByQuery.timeRange().range().from()},
-              "to": ${groupByQuery.timeRange().range().to()},
+              "from": ${query.timeRange().range().from()},
+              "to": ${query.timeRange().range().to()},
               "include_lower": true,
               "include_upper": true
             }
@@ -32,12 +32,12 @@
   },
   "aggregations": {
 
-<#if groupByQuery.groups()?has_content>
-      "by_${groupByQuery.field()}_range": {
+<#if query.groups()?has_content>
+      "by_${query.field()}_range": {
         "range":{
-          "field":"${groupByQuery.field()}",
+          "field":"${query.field()}",
           "ranges":[
-  <#list groupByQuery.groups() as range>
+  <#list query.groups() as range>
             {
               "from":${range.from()},
               "to":${range.to()}
@@ -47,21 +47,21 @@
           ]}
       }
 <#else>
-      "by_${groupByQuery.field()}": {
+      "by_${query.field()}": {
         "terms":{
-          "field":"${groupByQuery.field()}",
+          "field":"${query.field()}",
           "size":20
-  <#if groupByQuery.sort()?has_content>
+  <#if query.sort()?has_content>
           ,"order":{
-            "${groupByQuery.sort().getType().name()?lower_case}_${groupByQuery.sort().getField()}":"${groupByQuery.sort().getOrder()?lower_case}"
+            "${query.sort().getType().name()?lower_case}_${query.sort().getField()}":"${query.sort().getOrder()?lower_case}"
           }
         },
         "aggregations":{
-      <#switch groupByQuery.sort().getType().name()>
+      <#switch query.sort().getType().name()>
           <#case "AVG">
-          "avg_${groupByQuery.sort().getField()}":{
+          "avg_${query.sort().getField()}":{
             "avg":{
-              "field":"${groupByQuery.sort().getField()}"
+              "field":"${query.sort().getField()}"
             }
           }
           <#break>

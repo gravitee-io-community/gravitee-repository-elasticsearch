@@ -23,6 +23,9 @@ import java.io.Serializable;
  * Information about the sort value when the elasticsearch query contains
  * a order clause. 
  * 
+ * @author Guillaume Waignier
+ * @author Sebastien Devaux
+ *
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)

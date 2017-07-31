@@ -3,25 +3,25 @@
   "query": {
     "bool": {
       "filter": [
-<#if countQuery.query()?has_content>
+<#if query.query()?has_content>
         {
           "query_string": {
-            "query": "${countQuery.query().filter()}"
+            "query": "${query.query().filter()}"
           }
         },
 </#if>
-<#if countQuery.root()?has_content>
+<#if query.root()?has_content>
         {
           "term": {
-            "${countQuery.root().field()}": "${countQuery.root().id()}"
+            "${query.root().field()}": "${query.root().id()}"
           }
         },
 </#if>
         {
           "range": {
             "@timestamp": {
-              "from": ${countQuery.timeRange().range().from()},
-              "to": ${countQuery.timeRange().range().to()},
+              "from": ${query.timeRange().range().from()},
+              "to": ${query.timeRange().range().to()},
               "include_lower": true,
               "include_upper": true
             }

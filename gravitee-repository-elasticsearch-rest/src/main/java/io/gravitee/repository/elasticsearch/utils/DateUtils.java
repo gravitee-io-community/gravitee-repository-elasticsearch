@@ -24,19 +24,33 @@ import java.util.Date;
 import java.util.List;
 
 /**
+ * Utility class used to compute date format for Elasticsearch indexes.
+ * 
  * @author David BRASSELY (david.brassely at graviteesource.com)
+ * @author Guillaume Waignier
  * @author GraviteeSource Team
  */
 public final class DateUtils {
-
-    private final static DateTimeFormatter ES_DAILY_INDICE = DateTimeFormatter.ofPattern("yyyy.MM.dd");
+	
+	/**
+	 * Date format for Elasticsearch indexes.
+	 */
+    public static final DateTimeFormatter ES_DAILY_INDICE = DateTimeFormatter.ofPattern("yyyy.MM.dd");
+    
     private DateUtils() {}
 
-    public static List<String> rangedIndices(long from, long to) {
-        List<String> indices = new ArrayList<>();
+    /**
+     * Compute all suffix index names corresponding to Elasticsearch indexes between from and to.
+     * Used default system timezone.
+     * @param from timestamp for the start range time
+     * @param to timestamp for the end range time
+     * @return
+     */
+    public static List<String> rangedIndices(final long from, final long to) {
+        final List<String> indices = new ArrayList<>();
 
         LocalDate start = new Date(from).toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-        LocalDate stop = new Date(to).toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        final LocalDate stop = new Date(to).toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
 
         while(start.isBefore(stop) || start.isEqual(stop)) {
             indices.add(ES_DAILY_INDICE.format(start));

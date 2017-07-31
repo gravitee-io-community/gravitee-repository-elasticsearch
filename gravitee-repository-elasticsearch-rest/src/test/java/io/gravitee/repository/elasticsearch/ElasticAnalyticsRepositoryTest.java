@@ -68,7 +68,7 @@ public class ElasticAnalyticsRepositoryTest {
 
         DateHistogramResponse response = analyticsRepository.query(
                 dateHistogram()
-                        .timeRange(lastDays(60), hours(1))
+                        .timeRange(lastDays(90), hours(1))
                         .root("api", "be0aa9c9-ca1c-4d0a-8aa9-c9ca1c5d0aab")
                         .build());
 
