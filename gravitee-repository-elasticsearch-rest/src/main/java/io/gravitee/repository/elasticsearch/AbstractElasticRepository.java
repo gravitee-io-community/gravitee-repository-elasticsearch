@@ -69,4 +69,8 @@ public abstract class AbstractElasticRepository {
         final String suffixDay = LocalDate.now().format(DATE_TIME_FORMATTER);
         return configuration.getIndexName() + '-' + suffixDay;
     }
+
+    protected String getAllIndexName() {
+        return configuration.getIndexName() + "-*";
+    }
 }

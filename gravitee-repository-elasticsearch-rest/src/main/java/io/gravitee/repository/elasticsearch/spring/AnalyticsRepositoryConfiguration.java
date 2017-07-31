@@ -20,6 +20,7 @@ import io.gravitee.repository.elasticsearch.ElasticsearchComponent;
 import io.gravitee.repository.elasticsearch.analytics.ElasticAnalyticsRepository;
 import io.gravitee.repository.elasticsearch.configuration.ElasticConfiguration;
 import io.gravitee.repository.elasticsearch.healthcheck.ElasticHealthCheckRepository;
+import io.gravitee.repository.elasticsearch.log.ElasticLogRepository;
 import io.gravitee.repository.elasticsearch.monitoring.ElasticMonitoringRepository;
 import io.gravitee.repository.elasticsearch.utils.FreeMarkerComponent;
 import io.gravitee.repository.healthcheck.HealthCheckRepository;
@@ -65,4 +66,7 @@ public class AnalyticsRepositoryConfiguration {
     public ElasticsearchComponent elasticsearchComponent() {
         return new ElasticsearchComponent();
     }
+
+    @Bean
+    public ElasticLogRepository elasticLogRepository() { return new ElasticLogRepository(); }
 }
