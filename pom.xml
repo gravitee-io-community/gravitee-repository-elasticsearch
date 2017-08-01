@@ -39,6 +39,7 @@
 	<modules>
 		<module>gravitee-repository-elasticsearch-v2x</module>
 		<module>gravitee-repository-elasticsearch-v5x</module>
+		<module>gravitee-repository-elasticsearch-rest</module>
 	</modules>
 
 	<dependencies>
