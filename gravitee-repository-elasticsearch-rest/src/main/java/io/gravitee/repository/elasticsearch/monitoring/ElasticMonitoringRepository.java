@@ -36,8 +36,8 @@ import io.gravitee.repository.monitoring.model.MonitoringResponse;
 /**
  * @author Azize Elamrani (azize dot elamrani at gmail dot com)
  * @author GraviteeSource Team
- * @author Guillaume Waignier
- * @author Sebastien Devaux
+ * @author Guillaume Waignier (zenika)
+ * @author Sebastien Devaux (zenika)
  */
 public class ElasticMonitoringRepository extends AbstractElasticRepository implements MonitoringRepository {
 
@@ -68,11 +68,9 @@ public class ElasticMonitoringRepository extends AbstractElasticRepository imple
 
     @Override
     public MonitoringResponse query(final String gatewayId) {
+    	final String query = this.createElasticsearchJsonQuery(gatewayId);
+    	
         try {
-        	final Map<String, Object> data = new HashMap<>();
-        	data.put("gateway", gatewayId);
-
-        	final String query = this.freeMarkerComponent.generateFromTemplate(MONITORING_TEMPLATE, data);
             final ESSearchResponse searchResponse = this.elasticsearchComponent.search(this.elasticsearchIndexUtil.getTodayIndexName(), ES_TYPE_NAME, query);
 
             final SearchHits hits = searchResponse.getSearchHits();
@@ -80,12 +78,26 @@ public class ElasticMonitoringRepository extends AbstractElasticRepository imple
                 return this.convert(hits.getHits().get(0).getSource());
             }
         } catch(final TechnicalException exception) {
-        	logger.error("Impossible make query for monitoring", exception);
+        	logger.error("Impossible to make query for monitoring", exception);
         	return null;
         }
         //TODO return null?
         return null;
     }
+
+    /**
+     * Create JSON Elasticsearch query for the monitoring
+     * @param gatewayId id of the gateway
+     * @return JSON Elasticsearch query
+     */
+	private String createElasticsearchJsonQuery(final String gatewayId) {
+		final Map<String, Object> data = new HashMap<>();
+		data.put("gateway", gatewayId);
+
+		final String query = this.freeMarkerComponent.generateFromTemplate(MONITORING_TEMPLATE, data);
+		logger.debug("ES Query {}", query);
+		return query;
+	}
 
     /**
      * Convert the raw Elasticsearch response

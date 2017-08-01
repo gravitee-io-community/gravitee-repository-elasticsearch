@@ -39,8 +39,8 @@ import io.gravitee.repository.exceptions.TechnicalException;
 
 /**
  * Commmand used to handle DateHistogramQuery
- * @author Guillaume Waignier
- * @author Sebastien Devaux
+ * @author Guillaume Waignier (Zenika)
+ * @author Sebastien Devaux (Zenika)
  *
  */
 @Component
@@ -70,7 +70,6 @@ public class DateHistogramQueryCommand extends AstractElasticsearchQueryCommand<
 
 		try {
 			final ESSearchResponse result = this.elasticsearchComponent.search(this.elasticsearchIndexUtil.getIndexName(from, to), request);
-			logger.debug("ES response {}", result);
 			return this.toDateHistogramResponse(result, dateHistogramQuery);
 		} catch (final TechnicalException e) {
 			logger.error("Impossible to perform DateHistogramQuery", e);
@@ -80,14 +79,14 @@ public class DateHistogramQueryCommand extends AstractElasticsearchQueryCommand<
 
 	private DateHistogramResponse toDateHistogramResponse(final ESSearchResponse response,
 			final DateHistogramQuery query) {
-		DateHistogramResponse dateHistogramResponse = new DateHistogramResponse();
+		final DateHistogramResponse dateHistogramResponse = new DateHistogramResponse();
 
 		if (response.getAggregations() == null) {
 			return dateHistogramResponse;
 		}
 
 		// Prepare data
-		Map<String, Bucket> fieldBuckets = new HashMap<>();
+		final Map<String, Bucket> fieldBuckets = new HashMap<>();
 
 		final io.gravitee.repository.elasticsearch.model.elasticsearch.Aggregation dateHistogram = response
 				.getAggregations().get("by_date");

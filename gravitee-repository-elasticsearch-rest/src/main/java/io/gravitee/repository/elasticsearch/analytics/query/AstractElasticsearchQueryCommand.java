@@ -34,8 +34,8 @@ import io.gravitee.repository.elasticsearch.utils.FreeMarkerComponent;
  * 
  * Based on Command Design Pattern.
  * 
- * @author Guillaume Waignier
- * @author Sebastien Devaux
+ * @author Guillaume Waignier (Zenika)
+ * @author Sebastien Devaux (Zenika)
  *
  */
 public abstract class AstractElasticsearchQueryCommand<T extends Response> implements ElasticsearchQueryCommand<T> {
@@ -55,7 +55,7 @@ public abstract class AstractElasticsearchQueryCommand<T extends Response> imple
 	 * Templating component
 	 */
 	@Autowired
-	protected FreeMarkerComponent freeMarkerComponent;
+	private FreeMarkerComponent freeMarkerComponent;
 
 	/**
 	 * Util component used to compute index name.

@@ -22,8 +22,8 @@ import io.gravitee.repository.elasticsearch.utils.FreeMarkerComponent;
 
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
- * @author Guillaume Waignier
- * @author Sebastien Devaux
+ * @author Guillaume Waignier (zenika)
+ * @author Sebastien Devaux (zenika)
  * @author GraviteeSource Team
  */
 public abstract class AbstractElasticRepository {

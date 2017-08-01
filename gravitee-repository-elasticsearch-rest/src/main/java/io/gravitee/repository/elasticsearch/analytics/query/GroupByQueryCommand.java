@@ -61,7 +61,6 @@ public class GroupByQueryCommand extends AstractElasticsearchQueryCommand<GroupB
 			final Long to = groupByQuery.timeRange().range().to();
 			
 			final ESSearchResponse result = this.elasticsearchComponent.search(this.elasticsearchIndexUtil.getIndexName(from, to), request);
-			logger.debug("ES response {}", result);
 			return this.toGroupByResponse(result);
 		} catch (TechnicalException e) {
 			logger.error("Impossible to perform GroupByQuery", e);

@@ -15,24 +15,40 @@
  */
 package io.gravitee.repository.elasticsearch.log;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+
 import io.gravitee.common.http.HttpMethod;
 import io.gravitee.repository.log.model.Request;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.*;
-
 
 /**
+ * Builder for log request.
  * @author David BRASSELY (david.brassely at graviteesource.com)
  * @author GraviteeSource Team
+ * @author Guillaume Waignier (Zenika)
+ * @author Sebastien Devaux (Zenika)
  */
 final class LogRequestBuilder {
-
-    /** Document simple date format **/
-    private static SimpleDateFormat dtf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZZ");
+	
+	/**
+	 * Logger.
+	 */
+	private static final Logger logger = LoggerFactory.getLogger(LogRequestBuilder.class);
+	
+	/** Document simple date format **/
+	private static SimpleDateFormat dtf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX");
 
     private final static String FIELD_REQUEST_ID = "id";
     private final static String FIELD_TRANSACTION_ID = "transaction";
@@ -65,16 +81,17 @@ final class LogRequestBuilder {
 
     private final static String FIELD_MESSAGE = "message";
 
-    static Request build(JsonNode source, boolean full) {
-        Request request = new Request();
+    static Request build(final JsonNode source, final boolean full) {
+        final Request request = new Request();
 
         request.setId((source.get(FIELD_REQUEST_ID).asText()));
         request.setTransactionId(source.get(FIELD_TRANSACTION_ID).asText());
-
+        
         try {
-            request.setTimestamp(dtf.parse((source.get(FIELD_TIMESTAMP).asText())).getTime());
-        } catch (ParseException e) {
-            // TODO log error
+        	request.setTimestamp(dtf.parse((source.get(FIELD_TIMESTAMP).asText())).getTime());
+        } catch (final ParseException e) {
+        	logger.error("Impossible to parse date", e);
+        	throw new IllegalArgumentException("Impossible to parse timestamp field", e);
         }
 
         request.setUri(source.get(FIELD_URI).asText());
@@ -85,17 +102,17 @@ final class LogRequestBuilder {
         request.setStatus(source.get(FIELD_STATUS).asInt());
         request.setResponseTime(source.get(FIELD_RESPONSE_TIME).asInt());
 
-        Integer apiResponseTime = source.get(FIELD_API_RESPONSE_TIME).asInt();
+        final Integer apiResponseTime = source.get(FIELD_API_RESPONSE_TIME).asInt();
         if (apiResponseTime != null) {
             request.setApiResponseTime(apiResponseTime);
         }
 
-        Integer requestContentLength = source.get(FIELD_REQUEST_CONTENT_LENGTH).asInt();
+        final Integer requestContentLength = source.get(FIELD_REQUEST_CONTENT_LENGTH).asInt();
         if (requestContentLength != null) {
             request.setRequestContentLength(requestContentLength);
         }
 
-        Integer responseContentLength = source.get(FIELD_RESPONSE_CONTENT_LENGTH).asInt();
+        final Integer responseContentLength = source.get(FIELD_RESPONSE_CONTENT_LENGTH).asInt();
         if (responseContentLength != null) {
             request.setResponseContentLength(responseContentLength);
         }
@@ -126,7 +143,7 @@ final class LogRequestBuilder {
     }
 
     private static Map<String, List<String>> convertToMap(final JsonNode jsonNode) {
-        Map<String, List<String>> result = new HashMap<>();
+        final Map<String, List<String>> result = new HashMap<>();
 
         final Iterator<String> iterator = jsonNode.fieldNames();
         while (iterator.hasNext()) {

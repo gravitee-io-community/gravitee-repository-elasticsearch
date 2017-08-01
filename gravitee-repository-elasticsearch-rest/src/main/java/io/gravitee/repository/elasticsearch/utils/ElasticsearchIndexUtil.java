@@ -26,8 +26,8 @@ import io.gravitee.repository.elasticsearch.configuration.ElasticConfiguration;
 /**
  * Utility Spring been used to compute the elasticsearch index name. 
  * 
- * @author Guillaume Waignier
- * @author Sebastien Devaux
+ * @author Guillaume Waignier (zenika)
+ * @author Sebastien Devaux (zenika)
  *
  */
 @Component

@@ -24,8 +24,8 @@ import io.gravitee.repository.analytics.query.response.Response;
  * 
  * Based on Command Design Pattern.
  * 
- * @author Guillaume Waignier
- * @author Sebastien Devaux
+ * @author Guillaume Waignier (Zenika)
+ * @author Sebastien Devaux (Zenika)
  *
  */
 public interface ElasticsearchQueryCommand<T extends Response> {

@@ -35,8 +35,8 @@ import io.gravitee.repository.elasticsearch.AbstractElasticRepository;
  * @author David BRASSELY (david.brassely at graviteesource.com)
  * @author Titouan COMPIEGNE (titouan.compiegne at graviteesource.com)
  * @author GraviteeSource Team
- * @author Guillaume WAIGNIER
- * @author Sebastien DEVAUX
+ * @author Guillaume WAIGNIER (Zenika)
+ * @author Sebastien DEVAUX (Zenika)
  */
 public class ElasticAnalyticsRepository extends AbstractElasticRepository implements AnalyticsRepository {
 

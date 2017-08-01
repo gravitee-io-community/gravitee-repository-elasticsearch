@@ -31,8 +31,8 @@ import java.util.Map;
 
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
- * @author Guillaume Waignier
- * @author Sebastien Devaux
+ * @author Guillaume Waignier (Zenika)
+ * @author Sebastien Devaux (Zenika)
  * @author GraviteeSource Team
  */
 public class ElasticHealthCheckRepository extends AbstractElasticRepository implements HealthCheckRepository {
@@ -45,7 +45,7 @@ public class ElasticHealthCheckRepository extends AbstractElasticRepository impl
     /**
      * Elasticsearch document type corresponding to healthcheck.
      */
-    private final static String TYPE_HEALTH = "health";
+    private final static String ES_TYPE_NAME = "health";
 
     /**
      * Template name used to generate healthCheck query.
@@ -55,24 +55,36 @@ public class ElasticHealthCheckRepository extends AbstractElasticRepository impl
     @Override
     public HealthResponse query(final String api, final long interval, final long from, final long to) throws AnalyticsException {
 
+    	final String query = this.createElasticsearchJsonQuery(api, interval, from, to);
+    	
     	try {
-            final Map<String, Object> datas = new HashMap<>();
-            datas.put("api", api);
-            datas.put("interval", interval);
-            datas.put("from", from);
-            datas.put("to", to);
-
-            final String query = this.freeMarkerComponent.generateFromTemplate(HEALTHCHECK_TEMPLATE, datas);
-
-			final ESSearchResponse result = this.elasticsearchComponent.search(this.elasticsearchIndexUtil.getIndexName(from, to),TYPE_HEALTH, query);
-            logger.debug("ES response {}", result);
-
+   			final ESSearchResponse result = this.elasticsearchComponent.search(this.elasticsearchIndexUtil.getIndexName(from, to), ES_TYPE_NAME, query);
             return this.toHealthResponse(result);
     	} catch (final TechnicalException e) {
     		logger.error("An error occurs while looking for analytics with Elasticsearch", e);
     		throw new AnalyticsException("An error occurs while looking for analytics with Elasticsearch", e);
     	}
     }
+
+    /**
+     * Create JSON query for the healthcheck
+     * @param api api to check
+     * @param interval interval for check
+     * @param from start date (timestamp)
+     * @param to end date (timestamp)
+     * @return json ES query
+     */
+	private String createElasticsearchJsonQuery(final String api, final long interval, final long from, final long to) {
+		final Map<String, Object> datas = new HashMap<>();
+		datas.put("api", api);
+		datas.put("interval", interval);
+		datas.put("from", from);
+		datas.put("to", to);
+
+		final String query = this.freeMarkerComponent.generateFromTemplate(HEALTHCHECK_TEMPLATE, datas);
+		logger.debug("ES Query {}", query);
+		return query;
+	}
 
 
     /**
@@ -110,7 +122,7 @@ public class ElasticHealthCheckRepository extends AbstractElasticRepository impl
     }
     
     /**
-     * Fill an empty healthResponse
+     * Create an empty healthResponse
      * @param numberHistogram number of date histogram
      * @return healthResponse: the response to fill with empty success and failure
      */

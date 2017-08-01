@@ -35,8 +35,8 @@ import io.gravitee.repository.monitoring.MonitoringRepository;
 
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
- * @author Guillaume Waignier
- * @author Sebastien Devaux
+ * @author Guillaume Waignier (zenika)
+ * @author Sebastien Devaux (zenika)
  * @author GraviteeSource Team
  */
 @Configuration

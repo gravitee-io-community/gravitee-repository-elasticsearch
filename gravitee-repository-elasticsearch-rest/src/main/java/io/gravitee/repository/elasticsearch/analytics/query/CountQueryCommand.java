@@ -28,8 +28,8 @@ import io.gravitee.repository.exceptions.TechnicalException;
 /**
  * Commmand used to handle CountQuery
  * 
- * @author Guillaume Waignier
- * @author Sebastien Devaux
+ * @author Guillaume Waignier (Zenika)
+ * @author Sebastien Devaux (Zenika)
  *
  */
 public class CountQueryCommand extends AstractElasticsearchQueryCommand<CountResponse> {
@@ -57,7 +57,6 @@ public class CountQueryCommand extends AstractElasticsearchQueryCommand<CountRes
 			final Long to = countQuery.timeRange().range().to();
 			
 			final ESSearchResponse result = this.elasticsearchComponent.search(this.elasticsearchIndexUtil.getIndexName(from, to), request);
-			logger.debug("ES response {}", result);
 			return this.toCountResponse(result);
 		} catch (final TechnicalException e) {
 			logger.error("Impossible to perform GroupByQuery", e);
