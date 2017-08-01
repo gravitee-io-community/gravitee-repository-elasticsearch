@@ -3,8 +3,8 @@
 	"query": {
 		"range": {
 			"@timestamp": {
-				"lte": "2019-03-25T18:33:11.079+01:00",
-				"gte" : "2014-03-25T18:33:11.079+01:00"
+				"lte": "${indexDateToday?string['yyyy-MM-dd']}T18:33:11.079+01:00",
+				"gte" : "${indexDateToday?string['yyyy-MM-dd']}T09:33:11.079+01:00"
 			}
 		}
 	},

@@ -15,6 +15,9 @@
  */
 package io.gravitee.repository.elasticsearch;
 
+import java.io.IOException;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -25,8 +28,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-
 import io.gravitee.repository.analytics.AnalyticsException;
 import io.gravitee.repository.elasticsearch.healthcheck.ElasticHealthCheckRepository;
 import io.gravitee.repository.elasticsearch.spring.AnalyticsRepositoryConfiguration;
@@ -35,8 +36,8 @@ import io.gravitee.repository.elasticsearch.spring.mock.PropertySourceRepository
 import io.gravitee.repository.healthcheck.HealthResponse;
 
 /**
- * @author Guillaume Waignier
- * @author Sebastien Devaux
+ * @author Guillaume Waignier (Zenika)
+ * @author Sebastien Devaux (Zenika)
  *
  */
 @RunWith(SpringJUnit4ClassRunner.class)
@@ -44,37 +45,45 @@ import io.gravitee.repository.healthcheck.HealthResponse;
         classes = {AnalyticsRepositoryConfiguration.class,ConfigurationTest.class},
         initializers = PropertySourceRepositoryInitializer.class)
 public class ElasticHealthCheckRepositoryTest {
-
+    
     @Autowired
     private ElasticHealthCheckRepository elasticHealthCheckRepository;
 
     @Test
-    public void testQuery() throws AnalyticsException, JsonProcessingException {
+    public void testQuery() throws AnalyticsException, IOException {
+    	
+
     	//Do the call
-        final HealthResponse healthResponse = elasticHealthCheckRepository.query("bf19088c-f2c7-4fec-9908-8cf2c75fece4", 1,1490461201380L, 1490464801380L);
+		final Instant now = Instant.now().truncatedTo(ChronoUnit.DAYS);
+		final Instant tomorrow = now.plus(1, ChronoUnit.DAYS);
+		final Instant yesterday = now.minus(1, ChronoUnit.DAYS);
+		
+        final HealthResponse healthResponse = elasticHealthCheckRepository.query("bf19088c-f2c7-4fec-9908-8cf2c75fece4", 60, yesterday.toEpochMilli(), tomorrow.toEpochMilli());
+        
         
         // create the expected
+        //FIXME: need getter/setter to be able to use jackson to create the expected object in one line
+        final int length = 49;
         final HealthResponse expected = new HealthResponse();
-        final long[] timestamps = new long[61];
-        for (int idx = 0 ; idx < 61 ; ++idx) {
-        	timestamps[idx] = 1490461200000L + 60000L*idx;
+        final long[] timestamps = new long[length];
+        for (int idx = 0 ; idx < length ; ++idx) {
+        	timestamps[idx] = yesterday.toEpochMilli() + 3600000L*idx;
         }
         expected.timestamps(timestamps);
         
         final Map<Boolean,long[]> bucket = new HashMap<>();
         expected.buckets(bucket);
-        final long[] successState = new long[61];
-        final long[] failedState = new long[61];
+        final long[] successState = new long[length];
+        final long[] failedState = new long[length];
         bucket.put(true, successState);
         bucket.put(false, failedState);
-        successState[10]=1;
-        successState[27]=1;
-        successState[28]=2;
-        successState[29]=2;
-        successState[32]=2;
-        failedState[33]=1;
+        successState[17]=5;
+        successState[39]=1;
+        successState[40]=1;
+        successState[41]=3;
         
         // assert
+        //FIXME: need equals in healthResponse
         Assert.assertArrayEquals(expected.timestamps(), healthResponse.timestamps());
         Assert.assertArrayEquals(expected.buckets().get(true), healthResponse.buckets().get(true));
         Assert.assertArrayEquals(expected.buckets().get(false), healthResponse.buckets().get(false));

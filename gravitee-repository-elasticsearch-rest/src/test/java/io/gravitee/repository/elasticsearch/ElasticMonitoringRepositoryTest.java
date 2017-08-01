@@ -16,18 +16,7 @@
 package io.gravitee.repository.elasticsearch;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.ExecutionException;
 
-import org.asynchttpclient.ListenableFuture;
-import org.asynchttpclient.Response;
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
@@ -60,61 +49,17 @@ import io.gravitee.repository.monitoring.model.MonitoringResponse;
 public class ElasticMonitoringRepositoryTest {
 
     /** Logger. */
-    private final Logger logger = LoggerFactory.getLogger(ElasticsearchComponent.class);
+    private final Logger logger = LoggerFactory.getLogger(ElasticMonitoringRepositoryTest.class);
 
     @Autowired
     private ElasticMonitoringRepository elasticMonitoringRepository;
 
-    /**
-     * Use to call ES.
-     */
-    @Autowired
-    private ElasticsearchComponent elasticsearchComponent;
 
     /**
      * Templating tool.
      */
     @Autowired
     private FreeMarkerComponent freeMarkerComponent;
-
-    @Before
-    public void setUp() throws ExecutionException, InterruptedException {
-
-        final Map<String, Object> data = new HashMap<>();
-        data.put("indexDate", new Date());
-
-        final String body = this.freeMarkerComponent.generateFromTemplate("bulkMonitoring.json", data);
-
-        final ListenableFuture<Response> future = this.elasticsearchComponent.getRestPostClient("/_bulk")
-                .setBody(body)
-                .execute();
-        final Response response = future.get();
-
-        logger.info("Bulk data injected into ES {}", response.getResponseBody());
-        Thread.sleep(3000);
-        
-    }
-    
-    /**
-     * Remove mocked ES data
-     * @throws InterruptedException 
-     * @throws ExecutionException 
-     */
-    @After
-    public void tearDown() throws InterruptedException, ExecutionException {
-    	final LocalDate today = LocalDate.now();
-    	final String formatedDate = today.format(DateTimeFormatter.ofPattern("yyyy.MM.dd"));
-    	
-    	final ListenableFuture<Response> responseDelete1 = this.elasticsearchComponent.getRestDeleteClient("/gravitee-" + formatedDate + "/monitor/AVsFOS2okSadZDBaTAbl").execute();
-    	final ListenableFuture<Response> responseDelete2 = this.elasticsearchComponent.getRestDeleteClient("/gravitee-" + formatedDate + "/monitor/AVsFOXvXkSadZDBaTAbp").execute();
-    	final ListenableFuture<Response> responseDelete3 = this.elasticsearchComponent.getRestDeleteClient("/gravitee-" + formatedDate + "/monitor/AVsFOUE0kSadZDBaTAbm").execute();
-    	
-    	logger.debug("ES response {}", responseDelete1.get().getResponseBody(StandardCharsets.UTF_8));
-    	logger.debug("ES response {}", responseDelete2.get().getResponseBody(StandardCharsets.UTF_8));
-    	logger.debug("ES response {}", responseDelete3.get().getResponseBody(StandardCharsets.UTF_8));
-
-        Thread.sleep(2000);
-    }
 
     @Test
     public void testQuery() throws AnalyticsException, IOException {

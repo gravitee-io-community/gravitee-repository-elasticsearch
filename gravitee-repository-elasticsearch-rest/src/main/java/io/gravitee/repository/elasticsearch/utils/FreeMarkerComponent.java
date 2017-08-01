@@ -76,7 +76,7 @@ public class FreeMarkerComponent {
             return output.getBuffer().toString();
         } catch (final IOException | TemplateException exception) {
             logger.error("Impossible to generate from template {}", templateName, exception);
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException("Impossible to generate from template " + templateName, exception);
         }
     }
 

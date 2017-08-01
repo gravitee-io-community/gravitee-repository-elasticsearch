@@ -15,6 +15,11 @@
  */
 package io.gravitee.repository.elasticsearch.spring.mock;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 import javax.annotation.PostConstruct;
@@ -102,7 +107,12 @@ public class ElasticsearchNode {
 	 * @throws InterruptedException 
 	 */
 	private void fill() throws InterruptedException, ExecutionException {
-		final String body = this.freeMarkerComponent.generateFromTemplate("bulk.json");
+		final Map<String, Object> data = new HashMap<>();
+		final Instant now = Instant.now();
+		data.put("indexDateToday", Date.from(now));
+		data.put("indexDateYesterday", Date.from(now.minus(1, ChronoUnit.DAYS)));
+		
+		final String body = this.freeMarkerComponent.generateFromTemplate("bulk.json", data);
 		
 		final ListenableFuture<Response> future = this.elasticsearchComponent.getRestPostClient("/_bulk")
 				.setBody(body)

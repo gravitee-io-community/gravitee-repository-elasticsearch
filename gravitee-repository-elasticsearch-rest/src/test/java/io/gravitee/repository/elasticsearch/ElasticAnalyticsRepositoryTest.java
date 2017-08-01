@@ -40,6 +40,7 @@ import static io.gravitee.repository.analytics.query.QueryBuilders.*;
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
  * @author GraviteeSource Team
+ * FIXME test with equals
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(

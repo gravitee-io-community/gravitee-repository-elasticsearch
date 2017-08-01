@@ -35,6 +35,7 @@ import static io.gravitee.repository.analytics.query.QueryBuilders.tabular;
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
  * @author GraviteeSource Team
+ * FIXME need to test with equals
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(

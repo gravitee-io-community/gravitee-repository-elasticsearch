@@ -16,12 +16,15 @@
 package io.gravitee.repository.elasticsearch.utils;
 
 import java.io.IOException;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
@@ -34,7 +37,6 @@ import io.gravitee.repository.elasticsearch.model.elasticsearch.Health;
 import io.gravitee.repository.elasticsearch.spring.AnalyticsRepositoryConfiguration;
 import io.gravitee.repository.elasticsearch.spring.mock.ConfigurationTest;
 import io.gravitee.repository.elasticsearch.spring.mock.PropertySourceRepositoryInitializer;
-import io.gravitee.repository.elasticsearch.utils.FreeMarkerComponent;
 import io.gravitee.repository.exceptions.TechnicalException;
 
 /**
@@ -45,60 +47,72 @@ import io.gravitee.repository.exceptions.TechnicalException;
  *
  */
 @RunWith(SpringJUnit4ClassRunner.class)
-@ContextConfiguration(
-        classes = {AnalyticsRepositoryConfiguration.class, ConfigurationTest.class},
-        initializers = PropertySourceRepositoryInitializer.class)
+@ContextConfiguration(classes = { AnalyticsRepositoryConfiguration.class,
+		ConfigurationTest.class }, initializers = PropertySourceRepositoryInitializer.class)
 public class ElasticsearchComponentTest {
-	
+
+	/**
+	 * Logger.
+	 */
+	private final Logger logger = LoggerFactory.getLogger(ElasticsearchComponentTest.class);
+
 	/**
 	 * ES
 	 */
-    @Autowired
-    private ElasticsearchComponent elasticsearchComponent;
-    
-    /**
-     * Template tool.
-     */
-    @Autowired
-    private FreeMarkerComponent freeMarkerComponent;
-    
-    /**
-     * Json mapper.
-     */
-    private ObjectMapper mapper = new ObjectMapper();
-    
-    /**
-     * Test health
-     * @throws TechnicalException
-     */
-    @Test
-    public void testGenerateFromTemplateWithoutData() throws TechnicalException {
-    	
-    	// do the call
-    	final Health health = this.elasticsearchComponent.getClusterHealth();
-    	
-    	// assert
-    	Assert.assertEquals("gravitee_test", health.getClusterName());
-    }
+	@Autowired
+	private ElasticsearchComponent elasticsearchComponent;
 
-    /**
-     * test search
-     * @throws TechnicalException
-     * @throws IOException 
-     */
-    @Test
-    public void testSearch() throws TechnicalException, IOException {
+	/**
+	 * Template tool.
+	 */
+	@Autowired
+	private FreeMarkerComponent freeMarkerComponent;
 
-    	// do the call
-        final String query = this.freeMarkerComponent.generateFromTemplate("esQuery.json");
-        final ESSearchResponse result = this.elasticsearchComponent.search("_all", query);
+	/**
+	 * Json mapper.
+	 */
+	private ObjectMapper mapper = new ObjectMapper();
 
-        // assert
-        final Map<String, Object> data = new HashMap<>();
-        data.put("took", result.getTook());
-        final String expectedResponse = this.freeMarkerComponent.generateFromTemplate("esResponse.ftl", data);
-        final ESSearchResponse expectedEsSearchResponse = this.mapper.readValue(expectedResponse, ESSearchResponse.class);
-        
-        Assert.assertEquals(this.mapper.writeValueAsString(expectedEsSearchResponse), this.mapper.writeValueAsString(result));
-    }
+	/**
+	 * Test health
+	 * 
+	 * @throws TechnicalException
+	 */
+	@Test
+	public void testGenerateFromTemplateWithoutData() throws TechnicalException {
+
+		// do the call
+		final Health health = this.elasticsearchComponent.getClusterHealth();
+
+		// assert
+		Assert.assertEquals("gravitee_test", health.getClusterName());
+	}
+
+	/**
+	 * test search
+	 * 
+	 * @throws TechnicalException
+	 * @throws IOException
+	 */
+	@Test
+	public void testSearch() throws TechnicalException, IOException {
+
+		// do the call
+		final Map<String, Object> parameter = new HashMap<>();
+		parameter.put("indexDateToday", new Date());
+		final String query = this.freeMarkerComponent.generateFromTemplate("esQuery.json", parameter);
+		logger.debug("query is {}", query);
+
+		final ESSearchResponse result = this.elasticsearchComponent.search("_all", query);
+
+		// assert
+		final Map<String, Object> data = new HashMap<>();
+		data.put("took", result.getTook());
+		final String expectedResponse = this.freeMarkerComponent.generateFromTemplate("esResponse.json", data);
+		final ESSearchResponse expectedEsSearchResponse = this.mapper.readValue(expectedResponse,
+				ESSearchResponse.class);
+
+		Assert.assertEquals(this.mapper.writeValueAsString(expectedEsSearchResponse),
+				this.mapper.writeValueAsString(result));
+	}
 }
