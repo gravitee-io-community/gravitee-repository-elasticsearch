@@ -21,7 +21,7 @@ import io.gravitee.repository.elasticsearch.configuration.ElasticConfiguration;
 import io.gravitee.repository.elasticsearch.healthcheck.ElasticHealthCheckRepository;
 import io.gravitee.repository.elasticsearch.log.ElasticLogRepository;
 import io.gravitee.repository.elasticsearch.monitoring.ElasticMonitoringRepository;
-import io.gravitee.repository.healthcheck.HealthCheckRepository;
+import io.gravitee.repository.healthcheck.api.HealthCheckRepository;
 import io.gravitee.repository.log.api.LogRepository;
 import io.gravitee.repository.monitoring.MonitoringRepository;
 import org.springframework.context.annotation.Bean;
