@@ -299,8 +299,12 @@ public class ElasticHealthCheckRepository extends AbstractElasticRepository impl
 
     private Response apply(SearchRequestBuilder request, Function<SearchResponse, ? extends Response> function)  throws AnalyticsException {
         try {
+            logger.debug("ES request: {}", request);
+
             // Get the response from ES
             SearchResponse response = request.get();
+            logger.debug("ES response: {}", response);
+
             // Convert response
             return function.apply(response);
         } catch (ElasticsearchException ese) {
