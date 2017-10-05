@@ -18,7 +18,7 @@ package io.gravitee.repository.elasticsearch;
 import io.gravitee.repository.analytics.query.tabular.TabularResponse;
 import io.gravitee.repository.elasticsearch.spring.AnalyticsRepositoryTestConfiguration;
 import io.gravitee.repository.log.api.LogRepository;
-import io.gravitee.repository.log.model.Request;
+import io.gravitee.repository.log.model.ExtendedLog;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -52,9 +52,9 @@ public class ElasticLogRepositoryTest {
 
     @Test
     public void testFindById() throws Exception {
-        Request request = logRepository.findById("eb61a902-6ea6-4d8a-a1a9-026ea64d8a33");
+        ExtendedLog log = logRepository.findById("eb61a902-6ea6-4d8a-a1a9-026ea64d8a33");
 
-        Assert.assertNotNull(request);
+        Assert.assertNotNull(log);
     }
 
     @Test
