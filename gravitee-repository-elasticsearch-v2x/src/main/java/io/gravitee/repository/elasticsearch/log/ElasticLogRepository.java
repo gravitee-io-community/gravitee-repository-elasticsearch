@@ -20,7 +20,8 @@ import io.gravitee.repository.analytics.query.tabular.TabularQuery;
 import io.gravitee.repository.analytics.query.tabular.TabularResponse;
 import io.gravitee.repository.elasticsearch.AbstractElasticRepository;
 import io.gravitee.repository.log.api.LogRepository;
-import io.gravitee.repository.log.model.Request;
+import io.gravitee.repository.log.model.ExtendedLog;
+import io.gravitee.repository.log.model.Log;
 import org.elasticsearch.action.search.SearchRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.search.SearchType;
@@ -42,18 +43,21 @@ import static org.elasticsearch.index.query.QueryBuilders.termQuery;
  */
 public class ElasticLogRepository extends AbstractElasticRepository implements LogRepository {
 
+    private static final String [] EXCLUDED_FIELDS = new String [] { "*.client", "*.proxy" };
+
     @Override
     public TabularResponse query(TabularQuery query) throws AnalyticsException {
         SearchRequestBuilder requestBuilder = prepare(query);
+        requestBuilder.setFetchSource(null, EXCLUDED_FIELDS);
         return (TabularResponse) execute(requestBuilder, toTabularResponse());
     }
 
     @Override
-    public Request findById(String requestId) throws AnalyticsException {
+    public ExtendedLog findById(String logId) throws AnalyticsException {
         SearchRequestBuilder requestBuilder = createRequest(TYPE_REQUEST);
 
         BoolQueryBuilder boolQueryBuilder = boolQuery();
-        boolQueryBuilder.filter(termQuery(FIELD_REQUEST_ID, requestId));
+        boolQueryBuilder.filter(termQuery(FIELD_REQUEST_ID, logId));
 
         requestBuilder
                 .setQuery(boolQueryBuilder)
@@ -62,11 +66,11 @@ public class ElasticLogRepository extends AbstractElasticRepository implements L
         SearchResponse searchResponse = requestBuilder.get();
 
         if (searchResponse.getHits().getTotalHits() == 0) {
-            throw new AnalyticsException("Request [" + requestId + "] does not exist");
+            throw new AnalyticsException("Request [" + logId + "] does not exist");
         }
 
         Map<String, Object> source = searchResponse.getHits().getAt(0).getSource();
-        return LogRequestBuilder.build(source, true);
+        return LogBuilder.createExtendedLog(source);
     }
 
     private SearchRequestBuilder prepare(TabularQuery tabularQuery) throws AnalyticsException {
@@ -84,11 +88,11 @@ public class ElasticLogRepository extends AbstractElasticRepository implements L
         return response -> {
             SearchHits hits = response.getHits();
             TabularResponse tabularResponse = new TabularResponse(hits.totalHits());
-            List<Request> requests = new ArrayList<>(hits.hits().length);
+            List<Log> logs = new ArrayList<>(hits.hits().length);
             for(int i = 0 ; i < hits.hits().length ; i++) {
-                requests.add(LogRequestBuilder.build(hits.getAt(i).getSource(), false));
+                logs.add(LogBuilder.createLog(hits.getAt(i).getSource()));
             }
-            tabularResponse.setRequests(requests);
+            tabularResponse.setLogs(logs);
 
             return tabularResponse;
         };
