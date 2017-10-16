@@ -26,6 +26,7 @@ import org.elasticsearch.action.search.SearchRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.search.SearchType;
 import org.elasticsearch.index.query.BoolQueryBuilder;
+import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.sort.SortOrder;
 
@@ -69,8 +70,26 @@ public class ElasticLogRepository extends AbstractElasticRepository implements L
             throw new AnalyticsException("Request [" + logId + "] does not exist");
         }
 
-        Map<String, Object> source = searchResponse.getHits().getAt(0).getSource();
-        return LogBuilder.createExtendedLog(source);
+        SearchHit searchHit = searchResponse.getHits().getAt(0);
+        Map<String, Object> metrics = searchHit.getSource();
+
+        requestBuilder = createRequest(TYPE_LOG, searchHit.getIndex());
+
+        boolQueryBuilder = boolQuery().filter(termQuery(FIELD_REQUEST_ID, logId));
+
+        requestBuilder
+                .setQuery(boolQueryBuilder)
+                .setSearchType(SearchType.QUERY_AND_FETCH)
+                .setSize(1);
+
+        searchResponse = requestBuilder.get();
+
+        Map<String, Object> log = null;
+        if (searchResponse.getHits().getTotalHits() != 0) {
+            log = searchResponse.getHits().getAt(0).getSource();
+        }
+
+        return LogBuilder.createExtendedLog(metrics, log);
     }
 
     private SearchRequestBuilder prepare(TabularQuery tabularQuery) throws AnalyticsException {

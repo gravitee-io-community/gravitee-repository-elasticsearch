@@ -26,6 +26,7 @@ import org.elasticsearch.action.search.SearchRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.search.SearchType;
 import org.elasticsearch.index.query.BoolQueryBuilder;
+import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.sort.SortOrder;
 
@@ -43,12 +44,9 @@ import static org.elasticsearch.index.query.QueryBuilders.termQuery;
  */
 public class ElasticLogRepository extends AbstractElasticRepository implements LogRepository {
 
-    private static final String [] EXCLUDED_FIELDS = new String [] { "*.client", "*.proxy" };
-
     @Override
     public TabularResponse query(TabularQuery query) throws AnalyticsException {
         SearchRequestBuilder requestBuilder = prepare(query);
-        requestBuilder.setFetchSource(null, EXCLUDED_FIELDS);
         return (TabularResponse) execute(requestBuilder, toTabularResponse());
     }
 
@@ -56,12 +54,11 @@ public class ElasticLogRepository extends AbstractElasticRepository implements L
     public ExtendedLog findById(String logId) throws AnalyticsException {
         SearchRequestBuilder requestBuilder = createRequest(TYPE_REQUEST);
 
-        BoolQueryBuilder boolQueryBuilder = boolQuery();
-        boolQueryBuilder.filter(termQuery(FIELD_REQUEST_ID, logId));
+        BoolQueryBuilder boolQueryBuilder = boolQuery().filter(termQuery(FIELD_REQUEST_ID, logId));
 
         requestBuilder
                 .setQuery(boolQueryBuilder)
-                .setSearchType(SearchType.QUERY_AND_FETCH)
+                .setSearchType(SearchType.QUERY_THEN_FETCH)
                 .setSize(1);
         SearchResponse searchResponse = requestBuilder.get();
 
@@ -69,8 +66,26 @@ public class ElasticLogRepository extends AbstractElasticRepository implements L
             throw new AnalyticsException("Request [" + logId + "] does not exist");
         }
 
-        Map<String, Object> source = searchResponse.getHits().getAt(0).getSource();
-        return LogBuilder.createExtendedLog(source);
+        SearchHit searchHit = searchResponse.getHits().getAt(0);
+        Map<String, Object> metrics = searchHit.getSource();
+
+        requestBuilder = createRequest(TYPE_LOG, searchHit.getIndex());
+
+        boolQueryBuilder = boolQuery().filter(termQuery(FIELD_REQUEST_ID, logId));
+
+        requestBuilder
+                .setQuery(boolQueryBuilder)
+                .setSearchType(SearchType.QUERY_AND_FETCH)
+                .setSize(1);
+
+        searchResponse = requestBuilder.get();
+
+        Map<String, Object> log = null;
+        if (searchResponse.getHits().getTotalHits() != 0) {
+            log = searchResponse.getHits().getAt(0).getSource();
+        }
+
+        return LogBuilder.createExtendedLog(metrics, log);
     }
 
     private SearchRequestBuilder prepare(TabularQuery tabularQuery) throws AnalyticsException {

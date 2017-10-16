@@ -34,9 +34,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.function.Function;
 
-import static org.elasticsearch.index.query.QueryBuilders.boolQuery;
-import static org.elasticsearch.index.query.QueryBuilders.queryStringQuery;
-import static org.elasticsearch.index.query.QueryBuilders.termQuery;
+import static org.elasticsearch.index.query.QueryBuilders.*;
 
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
@@ -51,6 +49,7 @@ public abstract class AbstractElasticRepository {
 
     protected final static String FIELD_TIMESTAMP = "@timestamp";
     protected final static String TYPE_REQUEST = "request";
+    protected final static String TYPE_LOG = "log";
     protected final static String FIELD_REQUEST_ID = "id";
 
     @Autowired
@@ -75,6 +74,14 @@ public abstract class AbstractElasticRepository {
     protected SearchRequestBuilder createRequest(String type) {
         return client
                 .prepareSearch(configuration.getIndexName() + "-*")
+                .setIndicesOptions(IndicesOptions.lenientExpandOpen())
+                .setTypes(type)
+                .setSize(0);
+    }
+
+    protected SearchRequestBuilder createRequest(String type, String ... indices) {
+        return client
+                .prepareSearch(indices)
                 .setIndicesOptions(IndicesOptions.lenientExpandOpen())
                 .setTypes(type)
                 .setSize(0);

@@ -43,7 +43,6 @@ final class LogBuilder {
 
     private final static String FIELD_METHOD = "method";
     private final static String FIELD_URI = "uri";
-    private final static String FIELD_PATH = "path";
     private final static String FIELD_ENDPOINT = "endpoint";
     private final static String FIELD_REQUEST_CONTENT_LENGTH = "request-content-length";
     private final static String FIELD_RESPONSE_CONTENT_LENGTH = "response-content-length";
@@ -64,7 +63,6 @@ final class LogBuilder {
     private final static String FIELD_APPLICATION = "application";
     private final static String FIELD_API = "api";
     private final static String FIELD_PLAN = "plan";
-    private final static String FIELD_USER = "user";
     private final static String FIELD_API_KEY = "api-key";
 
     private final static String FIELD_MESSAGE = "message";
@@ -73,20 +71,22 @@ final class LogBuilder {
         return createLog(source, new Log());
     }
 
-    static ExtendedLog createExtendedLog(Map<String, Object> source) {
-        ExtendedLog log = createLog(source, new ExtendedLog());
+    static ExtendedLog createExtendedLog(Map<String, Object> metrics, Map<String, Object> log) {
+        ExtendedLog extentedLog = createLog(metrics, new ExtendedLog());
 
         // Add client and proxy requests / responses
-        Map<String, Object> clientRequest = (Map<String, Object>) source.get(FIELD_CLIENT_REQUEST);
-        log.setClientRequest(createRequest(clientRequest));
-        Map<String, Object> proxyRequest = (Map<String, Object>) source.get(FIELD_PROXY_REQUEST);
-        log.setProxyRequest(createRequest(proxyRequest));
-        Map<String, Object> clientResponse = (Map<String, Object>) source.get(FIELD_CLIENT_RESPONSE);
-        log.setClientResponse(createResponse(clientResponse));
-        Map<String, Object> proxyResponse = (Map<String, Object>) source.get(FIELD_PROXY_RESPONSE);
-        log.setProxyResponse(createResponse(proxyResponse));
+        if (log != null) {
+            Map<String, Object> clientRequest = (Map<String, Object>) log.get(FIELD_CLIENT_REQUEST);
+            extentedLog.setClientRequest(createRequest(clientRequest));
+            Map<String, Object> proxyRequest = (Map<String, Object>) log.get(FIELD_PROXY_REQUEST);
+            extentedLog.setProxyRequest(createRequest(proxyRequest));
+            Map<String, Object> clientResponse = (Map<String, Object>) log.get(FIELD_CLIENT_RESPONSE);
+            extentedLog.setClientResponse(createResponse(clientResponse));
+            Map<String, Object> proxyResponse = (Map<String, Object>) log.get(FIELD_PROXY_RESPONSE);
+            extentedLog.setProxyResponse(createResponse(proxyResponse));
+        }
 
-        return log;
+        return extentedLog;
     }
 
     private static Request createRequest(Map<String, Object> source) {
@@ -130,8 +130,12 @@ final class LogBuilder {
         log.setTimestamp(dtf.parseDateTime((String) source.get(FIELD_TIMESTAMP)).toInstant().getMillis());
 
         log.setUri((String) source.get(FIELD_URI));
-        log.setPath((String) source.get(FIELD_PATH));
-        log.setMethod(HttpMethod.valueOf((String) source.get(FIELD_METHOD)));
+        Object method = source.get(FIELD_METHOD);
+        if (method instanceof Integer) {
+            log.setMethod(HttpMethod.get((int) method));
+        } else {
+            log.setMethod(HttpMethod.valueOf((String) method));
+        }
         log.setEndpoint((String) source.get(FIELD_ENDPOINT));
 
         log.setStatus((int) source.get(FIELD_STATUS));
@@ -159,7 +163,6 @@ final class LogBuilder {
         log.setApplication((String) source.get(FIELD_APPLICATION));
         log.setApi((String) source.get(FIELD_API));
         log.setPlan((String) source.get(FIELD_PLAN));
-        log.setUser((String) source.get(FIELD_USER));
         log.setApiKey((String) source.get(FIELD_API_KEY));
         log.setGateway((String) source.get(FIELD_GATEWAY));
         log.setMessage((String) source.get(FIELD_MESSAGE));
