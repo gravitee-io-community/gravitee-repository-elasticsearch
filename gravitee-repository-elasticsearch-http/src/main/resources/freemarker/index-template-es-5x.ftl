@@ -26,9 +26,6 @@
 "gateway": {
 "type": "keyword"
 },
-"id": {
-"type": "keyword"
-},
 "local-address": {
 "type": "keyword",
 "index": false
@@ -102,9 +99,6 @@
 "type": "object",
 "enabled": false
 },
-"id": {
-"type": "keyword"
-},
 "proxy-request": {
 "type": "object",
 "enabled": false
@@ -128,9 +122,6 @@
 "type": "keyword"
 },
 "gateway": {
-"type": "keyword"
-},
-"id": {
 "type": "keyword"
 },
 "response-time": {

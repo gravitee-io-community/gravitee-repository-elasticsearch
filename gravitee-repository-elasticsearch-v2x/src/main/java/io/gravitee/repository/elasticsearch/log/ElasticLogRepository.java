@@ -25,7 +25,7 @@ import io.gravitee.repository.log.model.Log;
 import org.elasticsearch.action.search.SearchRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.search.SearchType;
-import org.elasticsearch.index.query.BoolQueryBuilder;
+import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.sort.SortOrder;
@@ -34,9 +34,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
-
-import static org.elasticsearch.index.query.QueryBuilders.boolQuery;
-import static org.elasticsearch.index.query.QueryBuilders.termQuery;
 
 /**
  * @author David BRASSELY (david.brassely at graviteesource.com)
@@ -55,15 +52,11 @@ public class ElasticLogRepository extends AbstractElasticRepository implements L
 
     @Override
     public ExtendedLog findById(String logId) throws AnalyticsException {
-        SearchRequestBuilder requestBuilder = createRequest(TYPE_REQUEST);
-
-        BoolQueryBuilder boolQueryBuilder = boolQuery();
-        boolQueryBuilder.filter(termQuery(FIELD_REQUEST_ID, logId));
-
-        requestBuilder
-                .setQuery(boolQueryBuilder)
-                .setSearchType(SearchType.QUERY_AND_FETCH)
+        SearchRequestBuilder requestBuilder = createRequest(TYPE_REQUEST)
+                .setQuery(QueryBuilders.idsQuery(TYPE_REQUEST).addIds(logId))
+                .setSearchType(SearchType.QUERY_THEN_FETCH)
                 .setSize(1);
+
         SearchResponse searchResponse = requestBuilder.get();
 
         if (searchResponse.getHits().getTotalHits() == 0) {
@@ -71,15 +64,10 @@ public class ElasticLogRepository extends AbstractElasticRepository implements L
         }
 
         SearchHit searchHit = searchResponse.getHits().getAt(0);
-        Map<String, Object> metrics = searchHit.getSource();
 
-        requestBuilder = createRequest(TYPE_LOG, searchHit.getIndex());
-
-        boolQueryBuilder = boolQuery().filter(termQuery(FIELD_REQUEST_ID, logId));
-
-        requestBuilder
-                .setQuery(boolQueryBuilder)
-                .setSearchType(SearchType.QUERY_AND_FETCH)
+        requestBuilder = createRequest(TYPE_LOG, searchHit.getIndex())
+                .setQuery(QueryBuilders.idsQuery(TYPE_LOG).addIds(logId))
+                .setSearchType(SearchType.QUERY_THEN_FETCH)
                 .setSize(1);
 
         searchResponse = requestBuilder.get();
@@ -89,7 +77,7 @@ public class ElasticLogRepository extends AbstractElasticRepository implements L
             log = searchResponse.getHits().getAt(0).getSource();
         }
 
-        return LogBuilder.createExtendedLog(metrics, log);
+        return LogBuilder.createExtendedLog(searchHit, log);
     }
 
     private SearchRequestBuilder prepare(TabularQuery tabularQuery) throws AnalyticsException {
@@ -109,7 +97,7 @@ public class ElasticLogRepository extends AbstractElasticRepository implements L
             TabularResponse tabularResponse = new TabularResponse(hits.totalHits());
             List<Log> logs = new ArrayList<>(hits.hits().length);
             for(int i = 0 ; i < hits.hits().length ; i++) {
-                logs.add(LogBuilder.createLog(hits.getAt(i).getSource()));
+                logs.add(LogBuilder.createLog(hits.getAt(i)));
             }
             tabularResponse.setLogs(logs);
 

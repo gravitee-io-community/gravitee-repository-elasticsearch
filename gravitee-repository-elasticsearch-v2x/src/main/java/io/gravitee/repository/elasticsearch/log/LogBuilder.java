@@ -21,6 +21,7 @@ import io.gravitee.repository.log.model.ExtendedLog;
 import io.gravitee.repository.log.model.Log;
 import io.gravitee.repository.log.model.Request;
 import io.gravitee.repository.log.model.Response;
+import org.elasticsearch.search.SearchHit;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
@@ -67,12 +68,15 @@ final class LogBuilder {
 
     private final static String FIELD_MESSAGE = "message";
 
-    static Log createLog(Map<String, Object> source) {
-        return createLog(source, new Log());
+    static Log createLog(SearchHit searchHit) {
+        Log log = createLog(searchHit.getSource(), new Log());
+        log.setId(searchHit.getId());
+        return log;
     }
 
-    static ExtendedLog createExtendedLog(Map<String, Object> metrics, Map<String, Object> log) {
-        ExtendedLog extentedLog = createLog(metrics, new ExtendedLog());
+    static ExtendedLog createExtendedLog(SearchHit searchHit, Map<String, Object> log) {
+        ExtendedLog extentedLog = createLog(searchHit.getSource(), new ExtendedLog());
+        extentedLog.setId(searchHit.getId());
 
         // Add client and proxy requests / responses
         if (log != null) {
@@ -125,7 +129,6 @@ final class LogBuilder {
     }
 
     private static <T extends Log> T createLog(Map<String, Object> source, T log) {
-        log.setId((String) source.get(FIELD_REQUEST_ID));
         log.setTransactionId((String) source.get(FIELD_TRANSACTION_ID));
         log.setTimestamp(dtf.parseDateTime((String) source.get(FIELD_TIMESTAMP)).toInstant().getMillis());
 

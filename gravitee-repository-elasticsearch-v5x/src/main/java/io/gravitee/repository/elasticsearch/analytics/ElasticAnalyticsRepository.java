@@ -191,37 +191,6 @@ public class ElasticAnalyticsRepository extends AbstractElasticRepository implem
                                 data.add(new Data(keyAsDate, (long) singleValue.value()));
                             }
                         }
-                        /*
-                            //TODO: check
-                            //switch (((InternalAggregation) subAggregation).getType().getName()) {
-                            switch (((InternalAggregation) subAggregation).getName()) {
-                                case "terms":
-                                    for (Terms.Bucket subTermsBucket : ((Terms) subAggregation).getBuckets()) {
-                                        data = bucketData.get(subTermsBucket.getKeyAsString());
-                                        if (data == null) {
-                                            data = new ArrayList<>();
-                                            bucketData.put(subTermsBucket.getKeyAsString(), data);
-                                        }
-                                        data.add(new Data(keyAsDate, subTermsBucket.getDocCount()));
-                                    }
-                                    break;
-                                case "min":
-                                case "max":
-                                case "avg":
-                                    InternalNumericMetricsAggregation.SingleValue singleValue = (InternalNumericMetricsAggregation.SingleValue) subAggregation;
-                                    if (Double.isFinite(singleValue.value())) {
-                                        data = bucketData.get(singleValue.getName());
-                                        if (data == null) {
-                                            data = new ArrayList<>();
-                                            bucketData.put(singleValue.getName(), data);
-                                        }
-                                        data.add(new Data(keyAsDate, (long) singleValue.value()));
-                                    }
-                                    break;
-                                default:
-                                    // nothing to do
-                            }
-                            */
                     }
                 }
             }

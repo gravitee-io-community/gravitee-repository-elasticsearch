@@ -50,7 +50,6 @@ public abstract class AbstractElasticRepository {
     protected final static String FIELD_TIMESTAMP = "@timestamp";
     protected final static String TYPE_REQUEST = "request";
     protected final static String TYPE_LOG = "log";
-    protected final static String FIELD_REQUEST_ID = "id";
 
     @Autowired
     protected ElasticConfiguration configuration;

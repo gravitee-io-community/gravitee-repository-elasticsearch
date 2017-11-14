@@ -18,6 +18,7 @@ package io.gravitee.repository.elasticsearch.healthcheck;
 import io.gravitee.common.http.HttpHeaders;
 import io.gravitee.common.http.HttpMethod;
 import io.gravitee.repository.healthcheck.query.log.*;
+import org.elasticsearch.search.SearchHit;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
@@ -34,7 +35,6 @@ final class LogBuilder {
     /** Document simple date format **/
     private static DateTimeFormatter dtf = DateTimeFormat.forPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZZ");
 
-    private final static String FIELD_ID = "id";
     private final static String FIELD_TIMESTAMP = "@timestamp";
 
     private final static String FIELD_GATEWAY = "gateway";
@@ -55,10 +55,11 @@ final class LogBuilder {
     private final static String FIELD_RESPONSE = "response";
     private final static String FIELD_REQUEST = "request";
 
-    static Log createLog(Map<String, Object> source) {
+    static Log createLog(SearchHit searchHit) {
         Log log = new Log();
 
-        log.setId((String) source.get(FIELD_ID));
+        Map<String, Object> source = searchHit.getSource();
+        log.setId(searchHit.getId());
         log.setTimestamp(dtf.parseDateTime((String) source.get(FIELD_TIMESTAMP)).toInstant().getMillis());
         log.setGateway((String) source.get(FIELD_GATEWAY));
         log.setEndpoint((String) source.get(FIELD_ENDPOINT));
@@ -89,10 +90,11 @@ final class LogBuilder {
         return log;
     }
 
-    static ExtendedLog createExtendedLog(Map<String, Object> source) {
+    static ExtendedLog createExtendedLog(SearchHit searchHit) {
         ExtendedLog log = new ExtendedLog();
 
-        log.setId((String) source.get(FIELD_ID));
+        Map<String, Object> source = searchHit.getSource();
+        log.setId(searchHit.getId());
         log.setTimestamp(dtf.parseDateTime((String) source.get(FIELD_TIMESTAMP)).toInstant().getMillis());
         log.setGateway((String) source.get(FIELD_GATEWAY));
         log.setEndpoint((String) source.get(FIELD_ENDPOINT));

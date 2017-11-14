@@ -29,7 +29,8 @@ import java.util.List;
  */
 public final class DateUtils {
 
-    private final static DateTimeFormatter ES_DAILY_INDICE = DateTimeFormatter.ofPattern("yyyy.MM.dd");
+    public  final static DateTimeFormatter ES_DAILY_INDICE = DateTimeFormatter.ofPattern("yyyy.MM.dd");
+
     private DateUtils() {}
 
     public static List<String> rangedIndices(long from, long to) {

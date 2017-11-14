@@ -15,6 +15,8 @@
  */
 package io.gravitee.repository.elasticsearch.monitoring;
 
+import io.gravitee.repository.elasticsearch.AbstractElasticRepository;
+import io.gravitee.repository.elasticsearch.utils.DateUtils;
 import io.gravitee.repository.monitoring.MonitoringRepository;
 import io.gravitee.repository.monitoring.model.MonitoringResponse;
 import org.elasticsearch.action.search.SearchRequestBuilder;
@@ -27,7 +29,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.Map;
 
 import static java.lang.String.format;
@@ -38,7 +39,7 @@ import static org.elasticsearch.index.query.QueryBuilders.termQuery;
  * @author Azize Elamrani (azize dot elamrani at gmail dot com)
  * @author GraviteeSource Team
  */
-public class ElasticMonitoringRepository implements MonitoringRepository {
+public class ElasticMonitoringRepository extends AbstractElasticRepository implements MonitoringRepository {
 
     private final static String FIELD_GATEWAY_NAME = "gateway";
     private final static String FIELD_TIMESTAMP = "@timestamp";
@@ -48,16 +49,18 @@ public class ElasticMonitoringRepository implements MonitoringRepository {
     private final static String FIELD_PROCESS = "process";
     private final static String FIELD_OS = "os";
 
+    private final static String TYPE_MONITOR = "monitor";
+
     @Autowired
     private Client client;
 
     @Override
     public MonitoringResponse query(final String gatewayId) {
-        final String suffixDay = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy.MM.dd"));
+        final String suffixDay = LocalDate.now().format(DateUtils.ES_DAILY_INDICE);
 
         final SearchRequestBuilder monitor = client
-                .prepareSearch("gravitee-" + suffixDay)
-                .setTypes("monitor")
+                .prepareSearch(configuration.getIndexName() + '-' + suffixDay)
+                .setTypes(TYPE_MONITOR)
                 .setQuery(boolQuery().must(termQuery(FIELD_GATEWAY_NAME, gatewayId)))
                 .setSearchType(SearchType.QUERY_THEN_FETCH)
                 .addSort(FIELD_TIMESTAMP, SortOrder.DESC)

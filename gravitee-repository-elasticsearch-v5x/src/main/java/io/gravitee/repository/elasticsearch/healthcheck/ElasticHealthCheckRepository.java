@@ -50,7 +50,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Function;
 
 import static org.elasticsearch.index.query.QueryBuilders.*;
@@ -85,23 +84,18 @@ public class ElasticHealthCheckRepository extends AbstractElasticRepository impl
 
     @Override
     public ExtendedLog findById(String logId) throws AnalyticsException {
-        SearchRequestBuilder requestBuilder = createRequest(TYPE_HEALTH);
-
-        BoolQueryBuilder boolQueryBuilder = boolQuery();
-        boolQueryBuilder.filter(termQuery(FIELD_REQUEST_ID, logId));
-
-        requestBuilder
-                .setQuery(boolQueryBuilder)
-                .setSearchType(SearchType.QUERY_AND_FETCH)
+        SearchRequestBuilder requestBuilder = createRequest(TYPE_HEALTH)
+                .setQuery(org.elasticsearch.index.query.QueryBuilders.idsQuery(TYPE_HEALTH).addIds(logId))
+                .setSearchType(SearchType.QUERY_THEN_FETCH)
                 .setSize(1);
+
         SearchResponse searchResponse = requestBuilder.get();
 
         if (searchResponse.getHits().getTotalHits() == 0) {
             throw new AnalyticsException("Health-check [" + logId + "] does not exist");
         }
 
-        Map<String, Object> source = searchResponse.getHits().getAt(0).getSource();
-        return LogBuilder.createExtendedLog(source);
+        return LogBuilder.createExtendedLog(searchResponse.getHits().getAt(0));
     }
 
     private Function<SearchResponse, ? extends Response> toLogsResponse() {
@@ -110,7 +104,7 @@ public class ElasticHealthCheckRepository extends AbstractElasticRepository impl
             LogsResponse logsResponse = new LogsResponse(hits.totalHits());
             List<Log> logs = new ArrayList<>(hits.hits().length);
             for(int i = 0 ; i < hits.hits().length ; i++) {
-                logs.add(LogBuilder.createLog(hits.getAt(i).getSource()));
+                logs.add(LogBuilder.createLog(hits.getAt(i)));
             }
             logsResponse.setLogs(logs);
 

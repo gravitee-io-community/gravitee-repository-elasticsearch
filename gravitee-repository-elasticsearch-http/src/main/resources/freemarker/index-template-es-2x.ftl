@@ -1,11 +1,11 @@
 <#ftl output_format="JSON">
 {
-   "template":"${indexName}-*",
-   "settings":{
-      "index.number_of_shards":5,
-      "index.number_of_replicas":1,
-      "refresh_interval":"1s"
-   },
+"template":"${indexName}-*",
+"settings":{
+"index.number_of_shards":5,
+"index.number_of_replicas":1,
+"refresh_interval":"1s"
+},
 "mappings": {
 "monitor": {
 "properties": {
@@ -239,10 +239,6 @@
 "index": "not_analyzed"
 },
 "hostname": {
-"type": "string",
-"index": "not_analyzed"
-},
-"id": {
 "type": "string",
 "index": "not_analyzed"
 },
