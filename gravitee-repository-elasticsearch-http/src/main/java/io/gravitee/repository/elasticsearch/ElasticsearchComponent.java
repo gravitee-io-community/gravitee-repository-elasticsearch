@@ -275,6 +275,7 @@ public class ElasticsearchComponent {
 				HttpClientRequest req = httpClient
 						.post(queryUrl)
 						.putHeader(HttpHeaders.CONTENT_TYPE, CONTENT_TYPE);
+				addCommonHeaders(req);
 				Observable<VertxHttpResponse> responseObservable = req
 						.exceptionHandler(subscriber::onError)
 						.toObservable()
@@ -330,6 +331,7 @@ public class ElasticsearchComponent {
 				HttpClientRequest req = httpClient
 						.put(templateUrl)
 						.putHeader(HttpHeaders.CONTENT_TYPE, CONTENT_TYPE);
+				addCommonHeaders(req);
 				Observable<VertxHttpResponse> responseObservable = req
 						.exceptionHandler(subscriber::onError)
 						.toObservable()
