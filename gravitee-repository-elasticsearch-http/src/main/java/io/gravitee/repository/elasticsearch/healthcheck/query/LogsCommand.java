@@ -68,7 +68,7 @@ public class LogsCommand extends AstractElasticsearchQueryCommand<LogsResponse> 
 					.toInstant()
 					.toEpochMilli();
 
-			final ESSearchResponse result = this.elasticsearchComponent.search(this.elasticsearchIndexUtil.getIndexName(from, now), request);
+			final ESSearchResponse result = this.elasticsearchComponent.search(this.elasticsearchIndexUtil.getIndexName(from, now), ES_TYPE_HEALTH, request);
 			return this.toLogsResponse(result);
 		} catch (TechnicalException e) {
 			logger.error("Impossible to perform AverageResponseTimeQuery", e);

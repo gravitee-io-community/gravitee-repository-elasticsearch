@@ -15,8 +15,9 @@
           "term": {
             "${query.root().field()}": "${query.root().id()}"
           }
-        },
+        }<#if query.timeRange()?has_content>,</#if>
 </#if>
+<#if query.timeRange()?has_content>
         {
           "range": {
             "@timestamp": {
@@ -27,6 +28,7 @@
             }
           }
         }
+</#if>
       ]
     }
   }

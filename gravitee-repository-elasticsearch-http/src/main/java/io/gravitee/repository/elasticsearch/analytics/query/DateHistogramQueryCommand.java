@@ -61,7 +61,7 @@ public class DateHistogramQueryCommand extends AstractElasticsearchQueryCommand<
 		final Long to = dateHistogramQuery.timeRange().range().to();
 
 		try {
-			final ESSearchResponse result = this.elasticsearchComponent.search(this.elasticsearchIndexUtil.getIndexName(from, to), request);
+			final ESSearchResponse result = this.elasticsearchComponent.search(this.elasticsearchIndexUtil.getIndexName(from, to), ES_TYPE_METRICS, request);
 			return this.toDateHistogramResponse(result, dateHistogramQuery);
 		} catch (final TechnicalException e) {
 			logger.error("Impossible to perform DateHistogramQuery", e);

@@ -25,7 +25,12 @@ import io.gravitee.repository.elasticsearch.model.elasticsearch.ESSearchResponse
 import io.gravitee.repository.elasticsearch.model.elasticsearch.Health;
 import io.gravitee.repository.elasticsearch.utils.FreeMarkerComponent;
 import io.gravitee.repository.exceptions.TechnicalException;
+import io.vertx.core.AsyncResult;
+import io.vertx.core.Handler;
 import io.vertx.core.http.HttpClientOptions;
+import io.vertx.rx.java.ObservableFuture;
+import io.vertx.rx.java.RxHelper;
+import io.vertx.rxjava.core.Context;
 import io.vertx.rxjava.core.Vertx;
 import io.vertx.rxjava.core.buffer.Buffer;
 import io.vertx.rxjava.core.http.HttpClient;
@@ -35,8 +40,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import rx.Observable;
+import rx.Observer;
+import rx.Single;
 import rx.Subscriber;
 import rx.functions.Func1;
+import rx.observers.Subscribers;
 
 import javax.annotation.PostConstruct;
 import java.io.IOException;
@@ -101,11 +109,15 @@ public class ElasticsearchComponent {
 
 	private int majorVersion;
 
+	private Context context;
+
     /**
      * Initialize the Async REST client.
      */
     @PostConstruct
 	public void start() throws ExecutionException, InterruptedException, IOException, TechnicalException {
+		context = vertx.getOrCreateContext();
+
 		if (! configuration.getEndpoints().isEmpty()) {
 			final Endpoint endpoint = configuration.getEndpoints().get(0);
 			final URI elasticEdpt = URI.create(endpoint.getUrl());
@@ -133,12 +145,12 @@ public class ElasticsearchComponent {
 
 			try {
 				this.majorVersion = getMajorVersion();
+
+				this.ensureTemplate();
 			} catch (Exception ex) {
-				throw new TechnicalException("An error occurs while getting information from Elasticsearch at "
+				logger.error("An error occurs while getting information from Elasticsearch at "
 						+ elasticEdpt.toString(), ex);
 			}
-
-			this.ensureTemplate();
 		}
 	}
 
@@ -273,40 +285,62 @@ public class ElasticsearchComponent {
 			url.append(URL_SEARCH);
 
 			final String queryUrl = url.toString();
-			Observable<VertxHttpResponse> get = Observable.unsafeCreate(subscriber -> {
-				HttpClientRequest req = httpClient
-						.post(queryUrl)
-						.putHeader(HttpHeaders.CONTENT_TYPE, CONTENT_TYPE);
-				addCommonHeaders(req);
-				Observable<VertxHttpResponse> responseObservable = req
-						.exceptionHandler(subscriber::onError)
-						.toObservable()
-						.flatMap(new Func1<HttpClientResponse, Observable<VertxHttpResponse>>() {
-							@Override
-							public Observable<VertxHttpResponse> call(HttpClientResponse httpClientResponse) {
-								return Observable.unsafeCreate(subscriber1 -> httpClientResponse.bodyHandler(body -> {
-									subscriber1.onNext(new VertxHttpResponse(httpClientResponse, body));
-									subscriber1.onCompleted();
-								}));
-							}
-						});
 
-				responseObservable.subscribe(subscriber);
-				req.end(query);
+			Single<ESSearchResponse> responseSingle = context.rxExecuteBlocking(new Handler<io.vertx.rxjava.core.Future<ESSearchResponse>>() {
+				@Override
+				public void handle(io.vertx.rxjava.core.Future<ESSearchResponse> future) {
+
+					HttpClientRequest req = httpClient
+							.post(queryUrl)
+							.putHeader(HttpHeaders.CONTENT_TYPE, CONTENT_TYPE);
+					addCommonHeaders(req);
+					req
+							.exceptionHandler(new Handler<Throwable>() {
+								@Override
+								public void handle(Throwable throwable) {
+									logger.error("Unexpected error: ", throwable);
+									future.fail(throwable);
+								}
+							})
+							.toObservable()
+							.subscribe(new Subscriber<HttpClientResponse>() {
+								@Override
+								public void onCompleted() {
+
+								}
+
+								@Override
+								public void onError(Throwable throwable) {
+									logger.error("Unexpected error: ", throwable);
+									future.fail(throwable);
+								}
+
+								@Override
+								public void onNext(HttpClientResponse httpClientResponse) {
+									httpClientResponse.bodyHandler(body -> {
+										if (httpClientResponse.statusCode() != HttpStatusCode.OK_200) {
+											logger.error("Impossible to call Elasticsearch POST {}.", queryUrl);
+											future.fail(new TechnicalException(
+													"Impossible to call Elasticsearch. Elasticsearch response code is " + httpClientResponse.statusCode()));
+										}
+
+										String sBody = body.toString();
+										logger.debug("Response of ES for POST {} : {}", queryUrl, sBody);
+
+										try {
+											future.complete(mapper.readValue(sBody, ESSearchResponse.class));
+										} catch (IOException ioe) {
+											future.fail(ioe);
+										}
+									});
+								}
+							});
+
+					req.end(query);
+				}
 			});
 
-			VertxHttpResponse single = get.toBlocking().single();
-
-			if (single.response.statusCode() != HttpStatusCode.OK_200) {
-				logger.error("Impossible to call Elasticsearch POST {}.", queryUrl);
-				throw new TechnicalException(
-						"Impossible to call Elasticsearch. Elasticsearch response code is " + single.response.statusCode() );
-			}
-
-			String body = single.body.toString();
-			logger.debug("Response of ES for POST {} : {}", queryUrl, body);
-
-			return this.mapper.readValue(body, ESSearchResponse.class);
+			return responseSingle.toBlocking().value();
 		} catch (final Exception e) {
 			logger.error("Impossible to call Elasticsearch", e);
 			throw new TechnicalException("Impossible to call Elasticsearch.", e);
