@@ -62,7 +62,9 @@ public abstract class AstractElasticsearchQueryCommand<T extends Response> imple
 	 */
 	@Autowired
 	protected ElasticsearchIndexUtil elasticsearchIndexUtil;
-	
+
+	protected final static String ES_TYPE_METRICS = "request";
+
 	/**
 	 * Create the elasticsearch query
 	 * @param templateName Freemarker template name

@@ -53,10 +53,16 @@ public class CountQueryCommand extends AstractElasticsearchQueryCommand<CountRes
 		final String request = this.createQuery(TEMPLATE, query);
 		
 		try {
-			final Long from = countQuery.timeRange().range().from();
-			final Long to = countQuery.timeRange().range().to();
-			
-			final ESSearchResponse result = this.elasticsearchComponent.search(this.elasticsearchIndexUtil.getIndexName(from, to), request);
+			final ESSearchResponse result;
+
+			if (countQuery.timeRange() != null) {
+				final Long from = countQuery.timeRange().range().from();
+				final Long to = countQuery.timeRange().range().to();
+
+				result = this.elasticsearchComponent.search(this.elasticsearchIndexUtil.getIndexName(from, to), ES_TYPE_METRICS, request);
+			} else {
+				result = this.elasticsearchComponent.search(this.elasticsearchIndexUtil.getTodayIndexName(), ES_TYPE_METRICS, request);
+			}
 			return this.toCountResponse(result);
 		} catch (final TechnicalException e) {
 			logger.error("Impossible to perform GroupByQuery", e);
