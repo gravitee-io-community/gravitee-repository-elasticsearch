@@ -14,8 +14,7 @@
 "index": false
 },
 "api-response-time": {
-"type": "integer",
-"index": false
+"type": "integer"
 },
 "application": {
 "type": "keyword"
@@ -38,8 +37,7 @@
 "type": "short"
 },
 "path": {
-"type": "keyword",
-"index": false
+"type": "keyword"
 },
 "plan": {
 "type": "keyword"
@@ -61,8 +59,7 @@
 "index": false
 },
 "response-time": {
-"type": "integer",
-"index": false
+"type": "integer"
 },
 "status": {
 "type": "short"
@@ -125,8 +122,7 @@
 "type": "keyword"
 },
 "response-time": {
-"type": "integer",
-"index": false
+"type": "integer"
 },
 "state": {
 "type": "integer",
