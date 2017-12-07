@@ -87,7 +87,7 @@ public class ElasticMonitoringRepository extends AbstractElasticRepository imple
 
         final Map<String, Object> cpu = (Map<String, Object>) os.get("cpu");
         monitoringResponse.setOsCPUPercent((Integer) cpu.get("percent"));
-        monitoringResponse.setOsCPULoadAverage((Map<String, Double>) cpu.get("load_average"));
+        monitoringResponse.setOsCPULoadAverage((Map<String, ? super Number  >) cpu.get("load_average"));
 
         final Map<String, Object> osMem = (Map<String, Object>) os.get("mem");
         monitoringResponse.setOsMemUsedInBytes(getLongValue(osMem.get("used_in_bytes")));
