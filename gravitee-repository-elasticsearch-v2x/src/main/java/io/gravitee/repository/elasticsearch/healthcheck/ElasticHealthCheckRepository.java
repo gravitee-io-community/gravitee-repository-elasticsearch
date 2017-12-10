@@ -16,6 +16,9 @@
 package io.gravitee.repository.elasticsearch.healthcheck;
 
 import io.gravitee.repository.analytics.AnalyticsException;
+import io.gravitee.repository.analytics.query.AggregationType;
+import io.gravitee.repository.analytics.query.response.histogram.Data;
+import io.gravitee.repository.healthcheck.query.response.histogram.DateHistogramResponse;
 import io.gravitee.repository.elasticsearch.AbstractElasticRepository;
 import io.gravitee.repository.healthcheck.api.HealthCheckRepository;
 import io.gravitee.repository.healthcheck.query.*;
@@ -33,12 +36,13 @@ import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.search.SearchType;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.search.SearchHits;
-import org.elasticsearch.search.aggregations.AggregationBuilder;
-import org.elasticsearch.search.aggregations.Aggregations;
+import org.elasticsearch.search.aggregations.*;
+import org.elasticsearch.search.aggregations.bucket.histogram.Histogram;
 import org.elasticsearch.search.aggregations.bucket.range.date.InternalDateRange;
 import org.elasticsearch.search.aggregations.bucket.terms.InternalTerms;
 import org.elasticsearch.search.aggregations.bucket.terms.Terms;
 import org.elasticsearch.search.aggregations.bucket.terms.TermsBuilder;
+import org.elasticsearch.search.aggregations.metrics.InternalNumericMetricsAggregation;
 import org.elasticsearch.search.aggregations.metrics.avg.InternalAvg;
 import org.elasticsearch.search.sort.SortOrder;
 import org.joda.time.DateTime;
@@ -47,9 +51,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.function.Function;
 
 import static org.elasticsearch.index.query.QueryBuilders.*;
@@ -77,6 +79,9 @@ public class ElasticHealthCheckRepository extends AbstractElasticRepository impl
         } else if (query instanceof LogsQuery) {
             SearchRequestBuilder requestBuilder = prepare((LogsQuery) query);
             return (T) apply(requestBuilder, toLogsResponse());
+        } else if (query instanceof DateHistogramQuery) {
+            SearchRequestBuilder requestBuilder = prepare((DateHistogramQuery) query);
+            return (T) apply(requestBuilder, toDateHistogramResponse((DateHistogramQuery) query));
         }
 
         return null;
@@ -96,6 +101,88 @@ public class ElasticHealthCheckRepository extends AbstractElasticRepository impl
         }
 
         return LogBuilder.createExtendedLog(searchResponse.getHits().getAt(0));
+    }
+
+    private Function<SearchResponse, DateHistogramResponse> toDateHistogramResponse(DateHistogramQuery query) {
+        return response -> {
+            DateHistogramResponse dateHistogramResponse = new DateHistogramResponse();
+
+            if (response.getAggregations() == null) {
+                return dateHistogramResponse;
+            }
+
+            // Prepare data
+            Map<String, io.gravitee.repository.analytics.query.response.histogram.Bucket> fieldBuckets = new HashMap<>();
+
+            Histogram dateHistogram = (Histogram) response.getAggregations().iterator().next();
+            for (Histogram.Bucket dateBucket : dateHistogram.getBuckets()) {
+                final long keyAsDate = ((DateTime) dateBucket.getKey()).getMillis();
+                dateHistogramResponse.timestamps().add(keyAsDate);
+
+                Iterator<Aggregation> subAggregationsIte = dateBucket.getAggregations().iterator();
+                if (subAggregationsIte.hasNext()) {
+                    while (subAggregationsIte.hasNext()) {
+                        Aggregation subAggregation = subAggregationsIte.next();
+                        io.gravitee.repository.analytics.query.response.histogram.Bucket fieldBucket = fieldBuckets.get(subAggregation.getName());
+                        if (fieldBucket == null) {
+                            fieldBucket = new io.gravitee.repository.analytics.query.response.histogram.Bucket(subAggregation.getName(), subAggregation.getName().split("_")[1]);
+                            fieldBuckets.put(subAggregation.getName(), fieldBucket);
+                        }
+
+                        Map<String, List<Data>> bucketData = fieldBucket.data();
+                        List<Data> data;
+
+                        if (subAggregation instanceof InternalAggregation)
+                            switch (((InternalAggregation) subAggregation).type().name()) {
+                                case "terms":
+                                    long successCount = 0;
+                                    long failureCount = 0;
+                                    for (Terms.Bucket subTermsBucket : ((Terms) subAggregation).getBuckets()) {
+                                        if (subTermsBucket.getKeyAsString().equals("1")) {
+                                            successCount = subTermsBucket.getDocCount();
+                                        } else {
+                                            failureCount = subTermsBucket.getDocCount();
+                                        }
+                                        double total = successCount + failureCount;
+                                        double percent = (total == 0) ? 100 : (successCount / total) * 100;
+
+                                        data = bucketData.computeIfAbsent(subAggregation.getName(), k -> new ArrayList<>());
+                                        data.add(new Data(keyAsDate, percent));
+                                    }
+                                    break;
+                                case "min":
+                                case "max":
+                                case "avg":
+                                    InternalNumericMetricsAggregation.SingleValue singleValue = (InternalNumericMetricsAggregation.SingleValue) subAggregation;
+                                    if (Double.isFinite(singleValue.value())) {
+                                        data = bucketData.get(singleValue.getName());
+                                        if (data == null) {
+                                            data = new ArrayList<>();
+                                            bucketData.put(singleValue.getName(), data);
+                                        }
+                                        data.add(new Data(keyAsDate, (long) singleValue.value()));
+                                    }
+                                    break;
+                                default:
+                                    // nothing to do
+                            }
+                    }
+                }
+            }
+
+            if (! query.aggregations().isEmpty()) {
+                query.aggregations().forEach(aggregation -> {
+                    String key = aggregation.type().name().toLowerCase() + '_' + aggregation.field();
+                    if (aggregation.type() == AggregationType.FIELD) {
+                        key = "by_" + aggregation.field();
+                    }
+
+                    dateHistogramResponse.values().add(fieldBuckets.get(key));
+                });
+            }
+
+            return dateHistogramResponse;
+        };
     }
 
     private Function<SearchResponse, ? extends Response> toLogsResponse() {
@@ -223,6 +310,35 @@ public class ElasticHealthCheckRepository extends AbstractElasticRepository impl
             endpointAvailability.setEndpointAvailabilities(endpointAvailabilities);
             return endpointAvailability;
         };
+    }
+
+    private SearchRequestBuilder prepare(DateHistogramQuery dateHistogramQuery) {
+        SearchRequestBuilder requestBuilder = init(dateHistogramQuery);
+
+        // Calculate aggregation
+        final AggregationBuilder byDateAggregation = dateHistogram("by_date")
+                .extendedBounds(dateHistogramQuery.timeRange().range().from(), dateHistogramQuery.timeRange().range().to())
+                .field(FIELD_TIMESTAMP)
+                .interval(dateHistogramQuery.timeRange().interval().toMillis())
+                .minDocCount(0);
+
+        // Create hits by aggregation
+        if (!dateHistogramQuery.aggregations().isEmpty()) {
+            dateHistogramQuery.aggregations().forEach(aggregation -> {
+                final AbstractAggregationBuilder hitsByAggregation;
+                if (AggregationType.AVG.equals(aggregation.type())) {
+                    hitsByAggregation = avg("avg_" + aggregation.field()).field(aggregation.field());
+                } else {
+                    hitsByAggregation = terms("by_" + aggregation.field()).field(aggregation.field());
+                }
+                byDateAggregation.subAggregation(hitsByAggregation);
+            });
+        }
+
+        // Set aggregation
+        requestBuilder.addAggregation(byDateAggregation);
+
+        return requestBuilder;
     }
 
     private SearchRequestBuilder prepare(AvailabilityQuery availabilityQuery) throws AnalyticsException {
