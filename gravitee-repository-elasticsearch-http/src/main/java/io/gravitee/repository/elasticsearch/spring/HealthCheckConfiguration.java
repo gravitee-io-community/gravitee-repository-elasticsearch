@@ -16,9 +16,7 @@
 package io.gravitee.repository.elasticsearch.spring;
 
 import io.gravitee.repository.elasticsearch.healthcheck.ElasticHealthCheckRepository;
-import io.gravitee.repository.elasticsearch.healthcheck.query.AverageAvailabilityCommand;
-import io.gravitee.repository.elasticsearch.healthcheck.query.AverageResponseTimeCommand;
-import io.gravitee.repository.elasticsearch.healthcheck.query.LogsCommand;
+import io.gravitee.repository.elasticsearch.healthcheck.query.*;
 import io.gravitee.repository.healthcheck.api.HealthCheckRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -48,5 +46,10 @@ public class HealthCheckConfiguration {
     @Bean
     public LogsCommand logsCommand() {
         return new LogsCommand();
+    }
+
+    @Bean
+    public AverageDateHistogramCommand averageDateHistogramCommand() {
+        return new AverageDateHistogramCommand();
     }
 }
