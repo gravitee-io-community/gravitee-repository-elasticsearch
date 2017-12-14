@@ -133,8 +133,13 @@ public class ElasticsearchComponent {
 
 				this.ensureTemplate();
 			} catch (Exception ex) {
-				logger.error("An error occurs while getting information from Elasticsearch at "
-						+ elasticEdpt.toString(), ex);
+				final String errorMessage = "An error occurs while getting information from Elasticsearch at "
+						+ elasticEdpt.toString();
+				if (logger.isDebugEnabled()) {
+					logger.error(errorMessage, ex);
+				} else {
+					logger.error(errorMessage);
+				}
 			}
 		}
 	}
