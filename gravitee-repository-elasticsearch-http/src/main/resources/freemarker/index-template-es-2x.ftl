@@ -2,8 +2,8 @@
 {
 "template":"${indexName}-*",
 "settings":{
-"index.number_of_shards":5,
-"index.number_of_replicas":1,
+"index.number_of_shards":${numberOfShards},
+"index.number_of_replicas":${numberOfReplicas},
 "refresh_interval":"1s"
 },
 "mappings": {

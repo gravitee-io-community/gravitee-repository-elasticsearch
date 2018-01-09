@@ -297,6 +297,8 @@ public class ElasticsearchComponent {
 
 			final Map<String, Object> data = new HashMap<>();
 			data.put("indexName", this.configuration.getIndexName());
+			data.put("numberOfShards", this.configuration.getNumberOfShards());
+			data.put("numberOfReplicas", this.configuration.getNumberOfReplicas());
 			final String template = this.freeMarkerComponent.generateFromTemplate("index-template-es-" + this.majorVersion + "x.ftl", data);
 
 			logger.debug("PUT template : {}", template);
