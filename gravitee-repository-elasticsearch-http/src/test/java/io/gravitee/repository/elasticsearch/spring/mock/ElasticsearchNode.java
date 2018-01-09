@@ -120,6 +120,8 @@ public class ElasticsearchNode {
 		data.put("indexName", "gravitee");
 		data.put("indexDateToday", Date.from(now));
 		data.put("indexDateYesterday", Date.from(now.minus(1, ChronoUnit.DAYS)));
+		data.put("numberOfShards", 5);
+		data.put("numberOfReplicas", 1);
 
 		PutIndexTemplateResponse putMappingResponse = this.node.client()
 				.admin()
