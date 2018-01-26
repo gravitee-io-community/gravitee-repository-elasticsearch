@@ -219,7 +219,7 @@ public class ElasticAnalyticsRepository extends AbstractElasticRepository implem
             }
 
             Aggregation aggregation = response.getAggregations().iterator().next();
-            groupByresponse.setField(aggregation.getName().split("_")[1]);
+            groupByresponse.setField(aggregation.getName().substring(aggregation.getName().indexOf('_') + 1));
 
             if (aggregation instanceof Range) {
                 Range range = (Range) aggregation;
