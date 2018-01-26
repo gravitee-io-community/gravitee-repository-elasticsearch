@@ -34,6 +34,7 @@ import io.gravitee.repository.exceptions.TechnicalException;
  * 
  * @author Guillaume Waignier
  * @author Sebastien Devaux
+ * @author Guillaume Gillon
  *
  */
 public class GroupByQueryCommand extends AstractElasticsearchQueryCommand<GroupByResponse> {
@@ -78,7 +79,8 @@ public class GroupByQueryCommand extends AstractElasticsearchQueryCommand<GroupB
 		final String aggregationName = response.getAggregations().keySet().iterator().next();
 		final io.gravitee.repository.elasticsearch.model.elasticsearch.Aggregation aggregation = response
 				.getAggregations().get(aggregationName);
-		final String fieldName = aggregationName.split("_")[1];
+
+		final String fieldName = aggregationName.substring(aggregationName.indexOf('_') + 1);
 
 		groupByresponse.setField(fieldName);
 
