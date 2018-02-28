@@ -160,7 +160,7 @@ public class ElasticsearchComponent {
 			req.end();
 		});
 
-		String body = observable.toBlocking().single();
+		String body = observable.toBlocking().first();
 		String version = mapper.readTree(body).path("version").path("number").asText();
 		float result = Float.valueOf(version.substring(0, 3));
 		int major = Integer.valueOf(version.substring(0, 1));
@@ -210,7 +210,7 @@ public class ElasticsearchComponent {
 				req.end();
 			});
 
-			String body = observable.toBlocking().single();
+			String body = observable.toBlocking().first();
 			logger.debug("Response of ES for GET {} : {}", URL_STATE_CLUSTER, body);
 
 			return this.mapper.readValue(body, Health.class);
@@ -255,30 +255,42 @@ public class ElasticsearchComponent {
 
 			final String queryUrl = url.toString();
 
-			Observable<String> observable = Observable.unsafeCreate(subscriber -> {
+			Observable<String> searchResponse = Observable.create(subscriber -> {
 				HttpClientRequest req = httpClient
 						.post(queryUrl)
 						.putHeader(HttpHeaders.CONTENT_TYPE, CONTENT_TYPE);
+
 				addCommonHeaders(req);
+
 				req
 						.exceptionHandler(subscriber::onError)
 						.toObservable()
-						.flatMap(resp -> {
-							if (resp.statusCode() != HttpStatusCode.OK_200) {
-								subscriber.onError(new RuntimeException(
-										"Impossible to call Elasticsearch. Elasticsearch response code is " + resp.statusCode()));
-							}
-							return Observable.just(Buffer.buffer()).mergeWith(resp.toObservable());
+						.onErrorReturn(throwable -> {
+							logger.error("Unexpected error while calling Elasticsearch.", throwable);
+							return null;
 						})
-						.reduce(Buffer::appendBuffer)
-						.map(Buffer::toString)
+						.flatMap(response -> {
+							if (response == null || response.statusCode() != 200) {
+								return Observable.just(null);
+							} else {
+								return Observable
+										.just(Buffer.buffer())
+										.mergeWith(response.toObservable())
+										.reduce(Buffer::appendBuffer)
+										.map(Buffer::toString);
+							}
+						})
 						.subscribe(subscriber);
 
 				req.end(query);
 			});
 
-			String body = observable.toBlocking().single();
-			return mapper.readValue(body, ESSearchResponse.class);
+			String body = searchResponse.toBlocking().single();
+			if (body != null) {
+				return mapper.readValue(body, ESSearchResponse.class);
+			} else {
+				throw new TechnicalException("Invalid search response from Elasticsearch.");
+			}
 		} catch (final Exception e) {
 			logger.error("Impossible to call Elasticsearch", e);
 			throw new TechnicalException("Impossible to call Elasticsearch.", e);
@@ -325,7 +337,7 @@ public class ElasticsearchComponent {
 				req.end(template);
 			});
 
-			String body = observable.toBlocking().single();
+			String body = observable.toBlocking().first();
 
 			logger.debug("Response of ES for PUT {} : {}",  URL_TEMPLATE + "/gravitee", body);
 		} catch (final Exception e) {
